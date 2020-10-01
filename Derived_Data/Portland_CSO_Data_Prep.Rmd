@@ -90,23 +90,25 @@ for (fn in fns) {
     
   #}
 }
+rm(test)
 ```
 All the warnings are about the "Total" rows by month, which we wanted to drop
 anyway.
 
+# Write Rainfall Data File
 ## Combine Data
-There aught to be a way to automat this step so I don't have to write out each 
+There aught to be a way to automate this step so I don't have to write out each 
 name.
 ```{r}
 raindata <- raindata_2015 %>%
   bind_rows(raindata_2016) %>%
   bind_rows(raindata_2017) %>%
   bind_rows(raindata_2018) %>%
+  bind_rows(raindata_2019) %>%
   mutate(across(! c(thedate, Comments), replace_na, 0))
-rm(raindata_2015, raindata_2016, raindata_2017, raindata_2018)
+rm(raindata_2015, raindata_2016, raindata_2017, raindata_2018, raindata_2019)
+rm(raindata_NA)
 ```
-
-## Write Rainfall Data File
 ```{r}
 write_csv(raindata, "rainfall.csv")
 ```
@@ -114,7 +116,8 @@ write_csv(raindata, "rainfall.csv")
 
 # Load CSO Event Files
 ## Collect File Names
-This is made slightly complicated because 
+This is made slightly complicated because of inconsistent file naming and format
+conventions.
 ```{r}
 rainfns <- list.files(niece, pattern = 'Rain')
 allfns  <- list.files(niece)
@@ -123,27 +126,288 @@ fns <- keep(fns, ~ file.exists(file.path(niece, .x)) &&
                    ! dir.exists(file.path(niece, .x)))
 print(fns)
 ```
-# Read Year From Each
+### Code to Extract Year From Each Filename
 This regex slight of hand searches each file name for four successive digits, 
-surrounded by zero or more characters on either side and substitutes "group 1"
-(which is the  matched string of four digits) for the whole string.  In other
-words, it extracts the year from teh variable filename.
+surrounded by zero or more characters on either side. Sub() replaces the pattern
+match (the whole string) with  "group 1" (the  matched string of four digits).
+In other words, it extracts the year from the variable filename.  (The group is
+defined by the parentheses.)
 ```{r}
 (years <- as.integer(sub('.*([0-9]{4}).*','\\1',fns)))
 ```
-Remember, the 2015 data format is differnet.
+
+## Read in 2015 Data
+Remember, the 2015 data format is different, so it has to be handled separately.
+(Events are not provided with a start and an end. but reported over multiple
+days.)
+
+Note also that the EEWTF wet weather flows are NOT reported by event. 
+
+Also note that there are non-numeric entries in the table which are informative,
+describing managmeent of teh CSOs.  Those entries will not read correctly here.
+Since e they are not relevant to our analyses, that does not matter for our
+current purposes, but it's worth remembering.
+
+### List Locations
+```{r}
+fn    <-"2015_Portland_CSO_Overflow_Estimates.xls"
+fpath <- file.path(niece, fn)
+
+CSO_locs_15 <- read_excel(fpath, range = 'E3:AI6', col_names = FALSE)[-3,] %>%
+  t() %>%
+  as.tibble() %>%
+  select(-1) %>%
+  rename(CSO = V3, Location = V2 ) %>%
+  select(CSO, Location)
+```
+
+### Read 2015 Data
+```{r}
+CSO_data_2015 <- read_excel(fpath,  skip = 5,
+                            col_types = c('numeric', 'date', 
+                                          'numeric', 'numeric',         # precip
+                                          rep('numeric', 31),                    # CSOs
+                                          'numeric',                    # Total
+                                          'skip', 'skip', 'skip', 'skip',
+                                           'skip', 'skip', 'skip','skip' )) %>%
+  rename(event=1, thedate = 2, totalprecip = 3, maxprecip = 4, eventtotal = 36) %>%
+  filter(! is.na(thedate)) %>%
+  mutate(thedate = as.Date(thedate)) %>%
+  fill(event, .direction = 'down') %>%
+  rename_with(~ sub(' ', '_', .))   # create syntactic names, for convenience
+  
+```
+Again, the warnings are expected, and not a problem.
+
+### Reprocess to Match Other File Format
+We use `pivot_longer()` -> `Group_by()` -> `summarize()`,
+followed by `pivot_wider()` to simplify application of similar
+aggregation functions to all the CSO locations.
 
 
 ```{r}
-for (fn in fns) {
-  # The first four characters of each file name gve the year
-  year = as.integer(sub('.*([0-9]{4}).*','\\1',fns))
-  fpath <- file.path(niece,fn)
+CSO_data_2015 <- CSO_data_2015 %>%
+  # First, use group_by( ) with mutate() to calculate first and last dates
+  # and max hourly precip for each event these columns are moved to the
+  # front to simplify the pivots, later.
+  group_by(event) %>%
+  mutate(firstdate = min(thedate),
+         lastdate = max(thedate),
+         totalprecip = sum(totalprecip, na.rm=TRUE),
+         maxprecip = max(maxprecip, na.rm=TRUE)) %>%
+  ungroup() %>%
+  select(event, firstdate, lastdate,    # reorder columns
+         totalprecip, maxprecip,
+         everything())%>%
   
-  # create a unique r symbol (name) for the each year's rain data
-  dataname = paste('CSO_data',as.character(year), sep = '_')
+  #Now pivot to long form, and summarize to generate event totals
+  pivot_longer(cols = CSO_002:eventtotal,
+               names_to = 'SourceCol',
+               values_to = 'Vol') %>%
+  group_by(event, SourceCol) %>%
+  summarize(firstdate = first(firstdate),
+            lastdate = last(lastdate),
+            days = as.integer(lastdate - firstdate) + 1,
+            totalprecip = first(totalprecip),
+            maxprecip = first(maxprecip),
+            total = sum(Vol),
+            .groups = 'drop') %>%
   
-  # Use map to iterate across all pages
-  pages <- excel_sheets(fpath)
-}
+  # and finally, pivot back to the other form.
+  pivot_wider(names_from = SourceCol, values_from = total)
 ```
+
+
+### Which CSOs Were Monitoried All Year in 2015?
+```{r}
+CSO_data_missing <- read_excel(fpath,  skip = 5,
+                            col_types = c('numeric', 'date', 
+                                          'skip', 'skip',         # precip
+                                          rep('text', 31),              # CSOs
+                                          'skip',                    # Total
+                                          'skip', 'skip', 'skip', 'skip',
+                                          'skip', 'skip', 'skip','skip' )) %>%
+  rename(event=1, thedate = 2) %>%
+  filter(! is.na(thedate)) %>%
+  mutate(thedate = as.Date(thedate)) %>%
+  fill(event, .direction = 'down') %>%
+  rename_with(~ sub(' ', '_', .))  %>%  # create syntactic names, for convenience
+
+  # First, use group_by( ) with mutate() to calculate first and last dates.
+  group_by(event) %>%
+  mutate(firstdate = min(thedate),
+         lastdate = max(thedate)) %>%
+  ungroup() %>%
+  select(event, firstdate, lastdate,    # reorder columns
+         everything()) %>%
+  
+  #Now pivot to long form, and summarize to flag unmeasured discharges
+  pivot_longer(cols = CSO_002:CSO_043,
+               names_to = 'SourceCol',
+               values_to = 'Vol') %>%
+  group_by(event, SourceCol) %>%
+  summarize(firstdate = first(firstdate),
+            lastdate = last(lastdate),
+            unmeasured = any(Vol == '--' | Vol == 'BLOCK'),
+            .groups = 'drop') %>%
+  group_by(SourceCol) %>%
+  summarize(n               = n(),
+            n_unmeasured    = sum(unmeasured, na.rm=TRUE),
+            pct_unmeasured = round(n_unmeasured/n,3)*100,
+            .groups = 'drop')
+
+ CSO_data_missing[CSO_data_missing$pct_unmeasured>0,] %>%
+   arrange(-n_unmeasured) %>%
+   knitr::kable(col.names = c('CSO', 'Events', 'Unmeasured', 'Percent'))
+```  
+  
+
+
+
+## Read the Other Files
+Unfortunately, the other files are not laid out quite consistently, so
+while it is possible to read these files in programatically, it is quicker
+(if less elegant) to just read each in separately.
+
+### 2016 Data
+```{r}
+fn <- "2016_Portland_Flows_-_Final.xlsx"
+fpath = file.path(niece, fn)
+
+CSO_data_2016 <- read_excel(fpath, skip = 5,
+                            col_types = c('numeric', 'date', 'date',
+                                          rep('numeric', 31),           # CSOs
+                                          'numeric',                    # Total
+                                          'numeric', 'numeric',         # precip
+                                          'skip', 'skip', 'skip',
+                                          'skip', 'skip')) %>%
+  rename(event=1, firstdate = 2, lastdate = 3, eventtotal = 35,
+         totalprecip = 36, maxprecip = 37 ) %>%
+  filter(! is.na(firstdate)) %>%
+  mutate(firstdate = as.Date(firstdate),
+         lastdate = as.Date(lastdate),
+         days = as.integer(lastdate - firstdate) + 1) %>%
+  rename_with(~ sub(' ', '_', .)) %>%  # create syntactic names, for convenience)
+  select(event, firstdate, lastdate, days, totalprecip, maxprecip, everything())
+```
+
+[3] "2019 Portland CSO Activity and Volumes - Final.xlsx"
+[4] "Portland_CSO_Activity_-_2017.xlsx"                  
+[5] "Portland_CSO_Activity_-_2018.xlsx"     
+
+
+### 2017 Data
+CSO 43 has been dropped, probably as inactive.
+
+There are a number of typographical errors in the date columns, especially 
+in the year designation in the lastdate value.
+```{r}
+fn <- "Portland_CSO_Activity_-_2017.xlsx"
+fpath = file.path(niece, fn)
+
+CSO_data_2017 <- read_excel(fpath, skip = 6,
+                            col_types = c('numeric', 'date', 'date',
+                                          rep('numeric', 30),           # CSOs
+                                          'numeric',                    # Total
+                                          'numeric', 'numeric',         # precip
+                                          'skip', 'skip', 'skip',
+                                          'skip', 'skip')) %>%
+  rename(event=1, firstdate = 2, lastdate = 3, eventtotal = 34,
+         totalprecip = 35, maxprecip = 36 ) %>%
+  filter(! is.na(firstdate)) %>%
+  mutate(firstdate = as.Date(firstdate),
+         lastdate  = as.Date(lastdate)) %>%
+  rename_with(~ sub(' ', '_', .))   # create syntactic names, for convenience)
+
+# Error Corrections
+
+CSO_data_2017 <- CSO_data_2017 %>%
+  mutate(year  = as.integer(format(lastdate, '%Y')),
+         mm = as.integer(format(lastdate, '%m')),
+         dd   = as.integer(format(lastdate, '%d'))) %>%
+  mutate(lastdate = if_else(year == 2007,
+                            as.Date(paste(year, mm, dd, sep = '-'),
+                                    format = '%Y-%m-%d'),
+                            lastdate)) %>%
+  select(-year, -mm, -dd)
+
+CSO_data_2017$lastdate[2] <- as.Date('2017-01-11', format = '%Y-%m-%d')
+
+# Assemble final data
+CSO_data_2017 <- CSO_data_2017 %>%
+  mutate(days = as.integer(lastdate - firstdate) + 1) %>%
+  select(event, firstdate, lastdate, days, totalprecip, maxprecip, everything())
+
+```
+
+### 2018 Data
+There is again one typographical error on the dates, where the year was
+transcribed incorrectly.
+```{r}
+fn <- "Portland_CSO_Activity_-_2018.xlsx"
+fpath = file.path(niece, fn)
+
+CSO_data_2018 <- read_excel(fpath, skip = 6,
+                            col_types = c('numeric', 'date', 'date',
+                                          rep('numeric', 30),           # CSOs
+                                          'numeric',                    # Total
+                                          'numeric', 'numeric',         # precip
+                                          'skip', 'skip', 'skip',
+                                          'skip', 'skip')) %>%
+  rename(event=1, firstdate = 2, lastdate = 3, eventtotal = 34,
+         totalprecip = 35, maxprecip = 36 ) %>%
+  filter(! is.na(firstdate)) %>%
+  mutate(firstdate = as.Date(firstdate),
+         lastdate  = as.Date(lastdate),
+         days = as.integer(lastdate - firstdate) + 1) %>%
+  rename_with(~ sub(' ', '_', .)) %>% # create syntactic names, for convenience)
+  select(event, firstdate, lastdate, days, totalprecip, maxprecip, everything())
+
+# Error Correction
+CSO_data_2018$lastdate[25] <- as.Date('2018-07-23', format = '%Y-%m-%d')
+CSO_data_2018$days[25] <- 2
+```
+
+### 2019 Data
+There is again one typogrphical error on the dates, where the year was
+transcribed incorrectly.
+```{r}
+fn <- "2019 Portland CSO Activity and Volumes - Final.xlsx"
+fpath = file.path(niece, fn)
+
+CSO_data_2019 <- read_excel(fpath, skip = 10,
+                            col_types = c('numeric', 'date', 'date',
+                                          rep('numeric', 30),           # CSOs
+                                          'numeric',                    # Total
+                                          'numeric', 'numeric',         # precip
+                                          'skip', 'skip', 'skip',
+                                          'skip', 'skip')) %>%
+  rename(event=1, firstdate = 2, lastdate = 3, eventtotal = 34,
+         totalprecip = 35, maxprecip = 36 ) %>%
+  filter(! is.na(firstdate)) %>%
+  mutate(firstdate = as.Date(firstdate),
+         lastdate  = as.Date(lastdate),
+         days = as.integer(lastdate - firstdate) + 1) %>%
+  rename_with(~ sub(' ', '_', .)) %>% # create syntactic names, for convenience)
+  select(event, firstdate, lastdate, days, totalprecip, maxprecip, everything())
+```
+
+# Save Five Years of Portland CSO Event Data
+## Combine Data
+There aught to be a way to automate this step so I don't have to write out each 
+name.
+```{r}
+CSO_data_15_19 <- CSO_data_2015 %>%
+  bind_rows(CSO_data_2016) %>%
+  bind_rows(CSO_data_2017) %>%
+  bind_rows(CSO_data_2018) %>%
+  bind_rows(CSO_data_2019)
+rm(CSO_data_2015, CSO_data_2016, CSO_data_2017, CSO_data_2018, CSO_data_2019)
+```
+
+```{r}
+write_csv(CSO_data_15_19, 'Portland_CSO_data_2015_2019.csv')
+```
+
+
+
