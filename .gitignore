@@ -37,3 +37,19 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+
+# Spyder Project File
+**/.spyproject
+
+# HTML versions of standard markdown files
+README.html
+Derived_Data/DATA_NOTES.html
+Original_Data/DATA_SOURCES.html
+
+# Directories to hide intermediate work products
+**/drafts
+**/sources
+**/testing
+
+#  Left over R Notebook HTML files
+*.nb.html

@@ -1,0 +1,149 @@
+---
+title: "Preparation of Portland CSO Data"
+author: Curtis C. Bohlen, Casco Bay Estuary Partnership
+output:
+  github_document:
+    toc: true
+    fig_width: 7
+    fig_height: 5
+---
+
+<img
+    src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
+    style="position:absolute;top:10px;right:50px;" />
+
+
+# Load Libraries
+```{r load_libraries}
+library(tidyverse)
+library(readxl)
+library(CBEPgraphics)
+
+load_cbep_fonts()
+```
+
+# Establish Folder Reference
+```{r folder_references}
+sibfldnm <- 'Original_Data'
+parent   <- dirname(getwd())
+sibling  <- file.path(parent,sibfldnm)
+niecenm  <- 'Portland_Data'
+niece    <- file.path(sibling, niecenm)
+
+```
+
+
+# Read Rain Data
+Notice that the DATES in these excel files are incorrect.  They are
+displayed in the spreadsheets as dates, showing only Month and Day, but the 
+underlying data is not necessarily from the year the data represents.  To
+correct for that, I assemble the date from day, month, and 
+
+## Find the Rain Files.
+```{r}
+fns <- list.files(niece, pattern = 'Rain')
+print(fns)
+```
+## Read Each Rain File
+We use a map_df() call to iterate across all the (monthly) dates and assemble
+single annual rainfall record.
+```{r}
+for (fn in fns) {
+  # The first four characters of each file name gve the year
+  year = as.numeric(substr(fn,1,4))
+  fpath <- file.path(niece,fn)
+  
+  # create a unique r symbol (name) for the each year's rain data
+  dataname = paste('raindata',as.character(year), sep = '_')
+  
+  # Use map to iterate across all pages
+  pages <- excel_sheets(fpath)
+  test <- map_df(pages, function(p) read_excel(fpath, sheet = p,
+                                               range = "A3:L34", skip = 2,
+                                   col_names = c("draftdate", "AADaily", "AAMax",
+                                                 "BBDaily", "BBMax",
+                                                 "RSDaily", "RSMax",
+                                                 "FSDaily", "FSMAx",
+                                                 "JetportDaily", "JetportMax",
+                                                 "Comments"),
+                                   col_types = c("date", "numeric", "numeric",
+                                                 "numeric","numeric",
+                                                 "numeric", "numeric",
+                                                 "numeric", "numeric",
+                                                 "numeric", "numeric",
+                                                 "text")))
+
+  # Clean up the data
+  test <- test %>%
+    mutate(dd      = as.numeric(format(draftdate, format = '%d')),
+           mm      = as.numeric(format(draftdate, format = '%m')),
+           thedate = as.Date(paste(year, mm, dd, sep = '-'),
+                           format = '%Y-%m-%d')) %>%
+    select(-draftdate, -dd, -mm) %>%
+    filter( ! is.na(thedate)) %>%
+    select(thedate, everything())
+  
+  assign(dataname, test)
+
+ # pages <- excel_sheets(fpath)
+ # for (page in pages[2:12]) {
+    
+  #}
+}
+```
+All the warnings are about the "Total" rows by month, which we wanted to drop
+anyway.
+
+## Combine Data
+There aught to be a way to automat this step so I don't have to write out each 
+name.
+```{r}
+raindata <- raindata_2015 %>%
+  bind_rows(raindata_2016) %>%
+  bind_rows(raindata_2017) %>%
+  bind_rows(raindata_2018) %>%
+  mutate(across(! c(thedate, Comments), replace_na, 0))
+rm(raindata_2015, raindata_2016, raindata_2017, raindata_2018)
+```
+
+## Write Rainfall Data File
+```{r}
+write_csv(raindata, "rainfall.csv")
+```
+
+
+# Load CSO Event Files
+## Collect File Names
+This is made slightly complicated because 
+```{r}
+rainfns <- list.files(niece, pattern = 'Rain')
+allfns  <- list.files(niece)
+fns <- allfns[! allfns %in% rainfns]
+fns <- keep(fns, ~ file.exists(file.path(niece, .x)) &&
+                   ! dir.exists(file.path(niece, .x)))
+print(fns)
+```
+# Read Year From Each
+This regex slight of hand searches each file name for four successive digits, 
+surrounded by zero or more characters on either side and substitutes "group 1"
+(which is the  matched string of four digits) for the whole string.  In other
+words, it extracts the year from teh variable filename.
+```{r}
+(years <- as.integer(sub('.*([0-9]{4}).*','\\1',fns)))
+```
+Remember, the 2015 data format is differnet.
+
+
+```{r}
+for (fn in fns) {
+  # The first four characters of each file name gve the year
+  year = as.integer(sub('.*([0-9]{4}).*','\\1',fns))
+  fpath <- file.path(niece,fn)
+  
+  # create a unique r symbol (name) for the each year's rain data
+  dataname = paste('CSO_data',as.character(year), sep = '_')
+  
+  # Use map to iterate across all pages
+  pages <- excel_sheets(fpath)
+}
+```

@@ -1,0 +1,283 @@
+---
+title: "Portland CSO Data ANalysis 2015-2017"
+output: html_notebook
+---
+
+
+#Load Libraries
+```{r}
+#library(readxl)
+library(readr)
+library(tidyverse)
+```
+
+
+#Assemble data
+```{r}
+
+wide.data <- read_csv("Portland CSO Activity 2015-2017.csv", 
+        col_types = cols(enddate = col_date(format = "%m/%d/%Y"), 
+                         eventno = col_character(),
+                         startdate = col_date(format = "%m/%d/%Y")))
+
+wide.data$TOTAL <- rowSums(wide.data[,5:35], na.rm = TRUE)
+wide.data$COUNT <- rowSums(wide.data[,5:35]>0, na.rm = TRUE)
+wide.data$YEAR <- factor(format(wide.data$startdate, "%Y"))
+
+summary(wide.data[,1:5])
+summary(wide.data[,30:40])
+```
+#Rearrange data to provide a "Tall" version
+```{r}
+tmp <- wide.data %>% select(-number, -TOTAL, -COUNT)
+tall.data <- gather(tmp, CSO, Discharge, CSO002:CSO042)
+tall.data$CSO <- factor(tall.data$CSO)
+rm(tmp)
+summary(tall.data)
+```
+
+#Total Discharges
+What are our total discharge volumes each year, in MIllions of Gallons?
+```{r}
+tapply(tall.data$Discharge, tall.data$YEAR, sum, na.rm = TRUE)/1000000
+```
+Compare that to the Total Portland EEWTF Overflow
+
+Year  Total CSO Overflow	EEWTF Overflow
+2015	221085900           165,380,000
+2016	318,359,690	        178,190,000	
+2017	164,977,000	        211,460,000
+
+And nominal DAILY discharge of ~ 18 MGD x 365 days....
+
+
+#Summarize Discharges by CSO
+```{r}
+csosumsandcounts <- tall.data %>% group_by(YEAR,CSO) %>% summarize(discharge = sum(Discharge, na.rm = TRUE), events = sum(Discharge>0, na.rm = TRUE))
+
+CSO_Summary <- csosumsandcounts %>% group_by(CSO) %>% summarize(means = mean(discharge, na.rm=TRUE), sds = sd(discharge, na.rm = TRUE),
+                                                       meancount = mean(events, na.rm=TRUE), sdcount = sd(events, na.rm = TRUE))
+
+write.table(CSO_Summary, 'CSO_OutfallCharacteristics.csv', sep = ',')
+```
+
+##Which CSOs have not discharged in last three years?
+```{r}
+tmp <- csosumsandcounts[which(csosumsandcounts$events==0),c(1,2)]
+plot(tmp)
+```
+
+##Which CSOs have discharged once a year or less?
+```{r}
+CSO_Summary$CSO[which(CSO_Summary$meancount<=3)]
+```
+
+##Which CSOs have not discharged in EACH of the last  three years?
+```{r}
+tall.data$CSO[which(CSO_Summary$means==0)]
+```
+
+
+
+##Plot a histogram showing the distibution of discharges
+```{r}
+plt <- ggplot(CSO_Summary) + aes(means/1000000) + geom_histogram(bins = 20) + xlab("Mean Annual Discharge (MG)") + ggtitle('Portland CSO Discharges by Outfall 2015-2017')
+plt
+```
+
+
+##Try to fit a gGAMMA distribution.  Not very satisfactory....
+```{r}
+plt <- ggplot(CSO_Summary) + aes(means/1000000) + geom_histogram(aes(y=..density..), bins = 20) + xlab("Mean Annual Discharge (MG)") + ggtitle('Portland CSO Discharges by Outfall 2015-2017')
+plt <- plt + stat_density(colour="blue", geom="line", position="identity") +
+  #stat_function(fun=dnorm, args=list(mean=mean(CSO_Summary$means/1000000), sd=sd(CSO_Summary$means/1000000))) +
+  stat_function(fun=dgamma, args=list(shape=mean(CSO_Summary$means/1000000)^2/sd(CSO_Summary$means/1000000)^2, scale=sd(CSO_Summary$means/1000000)^2/mean(CSO_Summary$means/1000000)), color = 'red')
+plt
+```
+
+
+```{r}
+plt <- ggplot(CSO_Summary) + aes(meancount) + geom_histogram(binwidth = 2) + xlab("Mean Annual Number of Discharge Events") + ggtitle('Portland CSO Discharge Events by Outfall 2015-2017')
+plt
+```
+
+##Plot the relationship betwen TOTAL discharges and the NUMBER Of discharges for each Outfall
+```{r}
+plt <- ggplot(CSO_Summary) + aes(meancount, means/1000000) + geom_point() + geom_smooth(method = 'lm')
+plt <- plt + xlab("Mean Annual Number of Discharge Events")  + ylab("Mean Annual Discharge (MG)") + ggtitle('Portland CSO Discharges by Outfall 2015-2017')
+plt <- plt + scale_y_log10(limits = c(0.1,100), breaks = c(0.1,1,10, 100))
+plt
+```
+
+##Plot discharge behavior for each outfall
+```{r, fig1, fig.width=6,fig.height=6}
+plt <- ggplot(csosumsandcounts) + aes(discharge/1000000, CSO, color = YEAR) + geom_point() + xlab("Total Annual Discharge (MG)") + ggtitle('Portland CSO Discharges 2015-2017') + scale_x_log10(limits = c(0.1,100), breaks = c(0.1,1,10, 100))
+plt
+```
+
+
+```{r, fig2, fig.width=6,fig.height=6}
+plt <- ggplot(csosumsandcounts) + aes(events, CSO, color = YEAR) + geom_point() + xlab("Number of Discharge Events") + ggtitle('Portland CSO Discharges 2015-2017')
+plt
+```
+
+##Relationship betwwen annual discharge and annual number of discharge events accross all outfalls and years.
+```{r, fig3, fig.width=6,fig.height=6}
+plt <- ggplot(csosumsandcounts) + geom_point(aes(discharge/1000000, events, shape = YEAR , color= CSO)) + geom_smooth(aes(discharge/1000000, events), method = 'lm')
+plt <- plt + xlab("Total Annual Discharge (MG)") + ylab('Number of Discharge Events') + ggtitle('Portland CSO Discharges 2015-2017')
+plt <- plt + scale_x_log10() + scale_y_log10()
+plt
+```
+
+
+#Looking for patterns in relationship to rainfall
+##Annual rainfall Patterns
+Note a large storm in 2015.
+```{r}
+plt <- ggplot(wide.data) + aes(YEAR, totprecip) + geom_violin() + ylab("Total Precipitation During Storm Event (in)") + scale_y_log10(limits =c(0.1, 10))
+plt
+```
+
+```{r}
+plt <- ggplot(wide.data) + aes(YEAR, maxprecip) + geom_violin() + ylab("Maximum Precipitation During Storm Event (in)") + scale_y_log10(limits =c(0.05, 5))
+plt
+```
+
+##Seasonal Rainfall Patterns?
+```{r}
+tmp <- wide.data %>% select(startdate, totprecip, maxprecip, TOTAL, YEAR) %>% mutate(Month = factor(format(startdate, "%m"),
+           labels = c("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")))
+plt <- ggplot(tmp) + aes(Month, totprecip, color = YEAR) + geom_point() +  
+  ylab("Precipitation During Storm Event (in)") + scale_y_log10(limits =c(0.05, 5))
+plt
+rm(tmp)
+```
+
+```{r}
+tmp <- wide.data %>% select(startdate, totprecip, maxprecip, TOTAL, YEAR) %>% mutate(Month =as.integer(format(startdate, "%m")))
+plt <- ggplot(tmp)  + geom_point(aes(Month, totprecip, color = YEAR)) +  geom_smooth(aes(Month, totprecip)) +
+  ylab("Precipitation During Storm Event (in)") + scale_y_log10(limits =c(0.05, 5))
+plt
+rm(tmp)
+```
+
+##Relationship between total and maximum rainfall
+```{r}
+plt <- ggplot(wide.data) + geom_point(aes(maxprecip, totprecip, color = YEAR)) + geom_smooth(aes(maxprecip, totprecip), method = 'lm')
+plt <- plt + ylab("Total Precipitation During Storm Event (in)") + xlab("Peak Hourly Precipitation During Storm Event (in)")
+plt <- plt + scale_y_log10() + scale_x_log10()
+plt
+```
+
+#Relationship between Discharges and Rainfall
+##Number of Discharging Outfalls
+```{r}
+plt <- ggplot(wide.data) 
+plt <- plt + geom_point(aes(maxprecip, COUNT, color = YEAR)) + geom_smooth(aes(maxprecip, COUNT), method = "lm")
+plt <- plt + scale_x_log10(breaks = c(0.01, 0.05, 0.1, 0.5, 1, 1.5, 2))
+plt <- plt + ylab('Number of Active Outfalls') + xlab('Peak Hourly Precipitation During Event (in)')
+plt
+```
+
+```{r}
+plt <- ggplot(wide.data) 
+plt <- plt + geom_point(aes(totprecip, COUNT, color = YEAR)) + geom_smooth(aes(totprecip, COUNT), method = "lm")
+plt <- plt + scale_x_log10(breaks = c(0.01, 0.05, 0.1, 0.5, 1, 1.5, 2,5,10))
+plt <- plt + ylab('Number of Active Outfalls') + xlab('Total Precipitation During Event (in)')
+plt
+```
+
+##Discharge VOlumes by Rainfall
+```{r}
+plt <- ggplot(wide.data)  + geom_point(aes(maxprecip, TOTAL/1000000, color = YEAR)) + geom_smooth(aes(maxprecip, TOTAL/1000000), method = "lm")
+plt <- plt + scale_x_log10() + scale_y_log10(breaks = c(0.1,1,10,100))
+plt <- plt + ylab('Discharge(MG) Per event') + xlab('Peak Hourly Precipitation During Event (in)')
+plt
+```
+
+There is some weak indication of lower discharges during low rain events.
+
+
+```{r}
+plt <- ggplot(wide.data)  + geom_point(aes(totprecip, TOTAL/1000000, color = YEAR)) + geom_smooth(aes(totprecip, TOTAL/1000000), method = "lm")
+plt <- plt + scale_y_log10(breaks = c(0.1,1,10,100)) + scale_x_log10(breaks = c(0.1,0.5,1,5,10))
+plt <- plt + ylab('Discharge(MG) Per event') + xlab('Total Precipitation During Event (in)')
+plt
+```
+
+So, visually, it looks like the NUMBER of CSOs discharging is determined mostly by peak discharge, but the VOLUME of discharge is more strongly influenced by TOTAL discharge.  That probably makes a lot of sense.
+
+
+Can we symbolize a 3-D surface and see what it looks like?
+```{r}
+plt <- ggplot(wide.data) + aes(totprecip, maxprecip, color = log10(TOTAL)) + geom_point(size = 5)
+plt <- plt + scale_y_log10(breaks = c(0.1,1,10,100)) + scale_x_log10(breaks = c(0.1,0.2, 0.5,1,2,5,10))
+plt <- plt + ylab('Maximum hourly Rainfall during Event (in)') + xlab('Total Precipitation During Event (in)')
+plt
+```
+
+
+#Formal Statistical modeling
+##A simple linear model
+First, test if both rainfall predictors are needed in a sinmple linear model
+```{r}
+the.lm <- lm(TOTAL~ totprecip+maxprecip, data = wide.data)
+anova(the.lm)
+the.lm <- lm(TOTAL~ maxprecip+totprecip, data = wide.data)
+anova(the.lm)
+summary(the.lm)
+```
+Nope, not really needed, but notice that maxprecip is only statistically important if enterd into the model before totprecip.  That suggests we should do NEARLY as well using a smplified model.
+
+```{r}
+the.lm2 <- lm(TOTAL~ totprecip, data = wide.data)
+anova(the.lm2)
+summary(the.lm2)
+```
+
+```{r}
+AIC(the.lm)
+AIC(the.lm2)
+```
+so, The model including both valirables is expected to be slightly better at prediction that the model with only total precip.  But historical data on total event precipitation may be easire to come by (depending on how a rainfall event is defined).  
+
+
+```{r}
+ps = predict(the.lm2, newdata = data.frame(totprecip = seq(0,6,0.1)), se = TRUE)
+predictions <- data.frame(totprecip = seq(0,6,0.1), Discharge = ps$fit/1000000, se = ps$se.fit/1000000)
+#predictions
+plt <- ggplot(predictions) + aes(totprecip,Discharge)+ geom_line()
+plt <- plt + geom_ribbon(aes(ymin=Discharge-se,ymax=Discharge+se),alpha=0.5, color = "blue")
+#plt <- plt + geom_errorbar(aes(ymin=Discharge-se, ymax=Discharge+se), width=.1)
+plt <- plt + geom_point(data = wide.data, aes(totprecip,TOTAL/1000000, color = YEAR))
+plt
+```
+
+#A log-LOg model
+```{r}
+the.lm <- lm(log10(TOTAL)~ log10(totprecip)+log10(maxprecip), data = wide.data)
+anova(the.lm)
+the.lm <- lm(log10(TOTAL)~ log10(maxprecip) + log10(totprecip), data = wide.data)
+anova(the.lm)
+summary(the.lm)
+```
+
+Note that in THIS formulation, both precipitation variables are signigicant, so we will not simplify.
+```{r}
+predictors = expand.grid(totprecip = seq(0,5,0.25), maxprecip = seq(0,2.5,0.25))
+ps = predict(the.lm, newdata = datafpredictors, se = TRUE)
+predictions <- data.frame(predictors$totprecip, predictors$maxprecip, Discharge = ps$fit, se = ps$se.fit)
+predictions
+# plt <- ggplot(predictions) + aes(totprecip,Discharge)+ geom_line()
+# plt <- plt + geom_ribbon(aes(ymin=Discharge-se,ymax=Discharge+se),alpha=0.5, color = "blue")
+# #plt <- plt + geom_errorbar(aes(ymin=Discharge-se, ymax=Discharge+se), width=.1)
+# plt <- plt + geom_point(data = wide.data, aes(totprecip,TOTAL/1000000, color = YEAR))
+# plt
+```
+
+
+```{r}
+a = expand.grid(totprecip = seq(0,5,0.25), maxprecip = seq(0,2.5,0.25))
+plot(a)
+```
+
