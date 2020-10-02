@@ -17,9 +17,6 @@ output:
 ```{r load_libraries}
 library(tidyverse)
 library(readxl)
-library(CBEPgraphics)
-
-load_cbep_fonts()
 ```
 
 # Establish Folder Reference

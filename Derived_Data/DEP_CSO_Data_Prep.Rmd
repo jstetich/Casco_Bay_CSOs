@@ -1,0 +1,182 @@
+---
+title: "Preparation of Maine DEP Annual CSO Data"
+author: Curtis C. Bohlen, Casco Bay Estuary Partnership
+output:
+  github_document:
+    toc: true
+    fig_width: 7
+    fig_height: 5
+---
+
+<img
+    src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
+    style="position:absolute;top:10px;right:50px;" />
+
+
+```{r, echo = FALSE}
+  knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+# Load Libraries
+```{r load_libraries}
+library(tidyverse)
+library(readxl)
+```
+
+# Load Data
+## 2019 Report Data
+```{r load_2019_data}
+dep_2019_Vol_data <- read_excel("2019_Report_Data.xlsx",
+                                sheet = 'Volume 2019',
+                                col_types = c('text', 'text',
+                                              rep('numeric',17))) %>%
+  rename_with(~ paste0('yr_', .), .cols = `1987`:`2019`) %>%
+  mutate(Community = sub('\\*\\*\\*', '', Community)) %>%
+  filter(! grepl('Total', Community))
+
+
+dep_2019_Event_data <- read_excel("2019_Report_Data.xlsx",
+                                  sheet = 'Events 2019',
+                                col_types = c('text', 'text',
+                                              rep('numeric',17))) %>%
+  rename_with(~ paste0('yr_', .), .cols = `1987`:`2019`) %>%
+  mutate(Community = sub('\\*\\*\\*', '', Community)) %>%
+  filter(! grepl('Total', Community))
+
+
+dep_2019_Outfall_data <- read_excel("2019_Report_Data.xlsx",
+                                    sheet = 'Outfalls 2019',
+                                col_types = c('text', 'text',
+                                              rep('numeric',21))) %>%
+  rename_with(~ paste0('yr_', .), .cols = `1987`:`2019`) %>%
+  mutate(Community = sub('\\*\\*\\*', '', Community)) %>%
+  filter(! grepl('Total', Community))
+
+```
+
+## 2008 Report Data
+```{r load_2008_data}
+dep_2008_Vol_data <- read_excel("2008_Report_Data.xlsx",
+                                sheet = 'Volume 2008',
+                                col_types = c('text', 'text',
+                                              rep('numeric',22))) %>%
+    rename_with(~ paste0('yr_', .), .cols = `1987`:`2008`) %>%
+    filter(! grepl('Total', Community))
+
+
+dep_2008_Event_data <- read_excel("2008_Report_Data.xlsx",
+                                  sheet = 'Events 2008',
+                                col_types = c('text', 'text',
+                                              rep('numeric',22))) %>%
+    rename_with(~ paste0('yr_', .), .cols = `1987`:`2008`)  %>%
+    filter(! (grepl('Total', Community) |
+                grepl('Mean', Community) |
+                grepl('Median', Community)))
+```
+
+## Harmonize Names
+```{r names_1}
+setdiff(dep_2019_Vol_data$Community, dep_2008_Vol_data$Community)
+setdiff(dep_2008_Vol_data$Community, dep_2019_Vol_data$Community)
+```
+```{r names_2}
+dep_2008_Vol_data$Community[dep_2008_Vol_data$Community == 
+                              "Cape Elizabeth (PWD)"] <- "Cape Elizabeth"
+dep_2008_Vol_data$Community[dep_2008_Vol_data$Community == 
+                              "Hallowell W.D.-2008 GAUD"] <- "Hallowell W.D. - 2008 GAUD"
+dep_2008_Vol_data$Community[dep_2008_Vol_data$Community == 
+                              "Cape Elizabeth (PWD)"] <- "Cape Elizabeth"
+dep_2008_Vol_data$Community[dep_2008_Vol_data$Community == 
+                             "Hallowell W.D.-2008 GAUD"] <- "Hallowell W.D. - 2008 GAUD"
+
+dep_2008_Event_data$Community[dep_2008_Event_data$Community == 
+                              "Cape Elizabeth (PWD)"] <- "Cape Elizabeth"
+dep_2008_Event_data$Community[dep_2008_Event_data$Community == 
+                              "Hallowell W.D.-2008 GAUD"] <- "Hallowell W.D. - 2008 GAUD"
+dep_2008_Event_data$Community[dep_2008_Event_data$Community == 
+                              "Cape Elizabeth (PWD)"] <- "Cape Elizabeth"
+dep_2008_Event_data$Community[dep_2008_Event_data$Community == 
+                             "Hallowell W.D.-2008 GAUD"] <- "Hallowell W.D. - 2008 GAUD"
+```
+
+### Check Results
+```{r names_3}
+setdiff(dep_2019_Vol_data$Community, dep_2008_Vol_data$Community)
+setdiff(dep_2008_Vol_data$Community, dep_2019_Vol_data$Community)
+```
+## Remove the Permit Numbers
+```{r rm_permit_num}
+dep_2008_Vol_data     <- dep_2008_Vol_data     %>% select(-`NPDES Permit No.`)
+dep_2008_Event_data   <- dep_2008_Event_data   %>% select(-`NPDES Permit No.`)
+dep_2019_Vol_data     <- dep_2019_Vol_data     %>% select(-`NPDES Permit No.`)
+dep_2019_Event_data   <- dep_2019_Event_data   %>% select(-`NPDES Permit No.`)
+dep_2019_Outfall_data <- dep_2019_Outfall_data %>% select(-`NPDES Permit No.`)
+```
+
+```{r build_data}
+vol_data <- dep_2008_Vol_data %>%
+  select(Community, yr_1997:yr_2004) %>%
+  full_join(dep_2019_Vol_data, by = 'Community') %>%
+  relocate(c(yr_1987, yr_1988), .before = yr_1997) %>%
+  pivot_longer(yr_1987:yr_2019, names_to = 'Year', values_to = 'Volume') %>%
+  mutate(Year = as.numeric(substr(Year, 4, 7))) %>%
+  filter(Year > 1996) # drop early data that is not accurate.
+
+event_data <- dep_2008_Event_data %>%
+  select(Community, yr_1997:yr_2004) %>%
+  full_join(dep_2019_Event_data, by = 'Community') %>%
+  relocate(c(yr_1987, yr_1988), .before = yr_1997) %>%
+  pivot_longer(yr_1987:yr_2019, names_to = 'Year', values_to = 'Events') %>%
+  mutate(Year = as.numeric(substr(Year, 4, 7)))
+
+outfall_data <- dep_2019_Outfall_data %>%
+  select (-`Year Unknown`) %>%
+  pivot_longer(yr_1987:yr_2019, names_to = 'Year', values_to = 'Outfalls') %>%
+  mutate(Year = as.numeric(substr(Year, 4, 7)))
+
+the_data <- vol_data %>%
+  left_join(event_data, by = c("Community", "Year")) %>%
+  left_join(outfall_data, by = c("Community", "Year"))
+  
+
+```
+
+```{r rm_extras}
+rm(dep_2008_Event_data, dep_2008_Vol_data, dep_2019_Event_data,
+   dep_2019_Outfall_data, dep_2019_Vol_data)
+rm(vol_data, event_data, outfall_data)
+```
+
+# Save Data to File
+```{r save_results}
+write_csv(the_data, 'DEP_Annual_Totals.csv')
+```
+
+# Identify Casco Bay CSO Communities by Name
+
+```{r casco_towns}
+cbep_towns <- c("Cape Elizabeth",
+                "Portland & PWD",
+                "South Portland",
+                "Westbrook",
+                "Yarmouth")            
+```
+
+# Which Years
+Many years included in the 2008 data are deeply suspect because the data was
+estimated and not directly measured.  Yarmouth ceased discharging by CSO in
+2001, and they never measured discharges, but estimated volumes were always
+small.
+```{r years_measured}
+first_measured <- tribble(~Town, ~Year,
+"Cape Elizabeth", 2002,
+"Portland & PWD", 1997,
+"South Portland", 1997,
+"Westbrook",      1997,
+"Yarmouth",       NA)
+knitr::kable(first_measured, caption = "Year CSO volumes were first regularly measured.")
+```
+But the vast majority of volumes are from sites that have been measured
+since 1997, so we track the data only since then.  By doing so, I am
+
+

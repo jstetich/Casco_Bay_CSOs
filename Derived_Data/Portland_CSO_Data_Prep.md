@@ -52,9 +52,6 @@ library(tidyverse)
 
 ``` r
 library(readxl)
-library(CBEPgraphics)
-
-load_cbep_fonts()
 ```
 
 # Establish Folder Reference
@@ -1733,14 +1730,11 @@ fns <- keep(fns, ~ file.exists(file.path(niece, .x)) &&
 print(fns)
 ```
 
-    ## [1] "~$2016_Portland_Flows_-_Final.xlsx"                 
-    ## [2] "~$Portland_CSO_Activity_-_2017.xlsx"                
-    ## [3] "~$Portland_CSO_Activity_-_2018.xlsx"                
-    ## [4] "2015_Portland_CSO_Overflow_Estimates.xls"           
-    ## [5] "2016_Portland_Flows_-_Final.xlsx"                   
-    ## [6] "2019 Portland CSO Activity and Volumes - Final.xlsx"
-    ## [7] "Portland_CSO_Activity_-_2017.xlsx"                  
-    ## [8] "Portland_CSO_Activity_-_2018.xlsx"
+    ## [1] "2015_Portland_CSO_Overflow_Estimates.xls"           
+    ## [2] "2016_Portland_Flows_-_Final.xlsx"                   
+    ## [3] "2019 Portland CSO Activity and Volumes - Final.xlsx"
+    ## [4] "Portland_CSO_Activity_-_2017.xlsx"                  
+    ## [5] "Portland_CSO_Activity_-_2018.xlsx"
 
 ### Code to Extract Year From Each Filename
 
@@ -1754,7 +1748,7 @@ from the variable filename. (The group is defined by the parentheses.)
 (years <- as.integer(sub('.*([0-9]{4}).*','\\1',fns)))
 ```
 
-    ## [1] 2016 2017 2018 2015 2016 2019 2017 2018
+    ## [1] 2015 2016 2019 2017 2018
 
 ## Read in 2015 Data
 
