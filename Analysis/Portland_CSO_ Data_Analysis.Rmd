@@ -1,57 +1,113 @@
 ---
-title: "Portland CSO Data ANalysis 2015-2017"
-output: html_notebook
+title: "Casco Bay CSO Data Analysis, based on DEP Annual Reports"
+author: Curtis C. Bohlen, Casco Bay Estuary Partnership
+output:
+  github_document:
+    toc: true
+    fig_width: 7
+    fig_height: 5
 ---
+
+<img
+    src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
+    style="position:absolute;top:10px;right:50px;" />
+
+```{r, echo = FALSE}
+  knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
 
 
 #Load Libraries
-```{r}
-#library(readxl)
-library(readr)
+```{r load_libraries}
 library(tidyverse)
+
+library(CBEPgraphics)
+load_cbep_fonts()
+theme_set(theme_cbep())
+
 ```
 
+# Establish Folder Reference
+```{r folder_references}
+sibfldnm <- 'Derived_Data'
+parent   <- dirname(getwd())
+sibling  <- file.path(parent,sibfldnm)
 
-#Assemble data
+```
+
+# Load Data
 ```{r}
-
-wide.data <- read_csv("Portland CSO Activity 2015-2017.csv", 
-        col_types = cols(enddate = col_date(format = "%m/%d/%Y"), 
-                         eventno = col_character(),
-                         startdate = col_date(format = "%m/%d/%Y")))
-
-wide.data$TOTAL <- rowSums(wide.data[,5:35], na.rm = TRUE)
-wide.data$COUNT <- rowSums(wide.data[,5:35]>0, na.rm = TRUE)
-wide.data$YEAR <- factor(format(wide.data$startdate, "%Y"))
-
-summary(wide.data[,1:5])
-summary(wide.data[,30:40])
-```
-#Rearrange data to provide a "Tall" version
-```{r}
-tmp <- wide.data %>% select(-number, -TOTAL, -COUNT)
-tall.data <- gather(tmp, CSO, Discharge, CSO002:CSO042)
-tall.data$CSO <- factor(tall.data$CSO)
-rm(tmp)
-summary(tall.data)
+fn <-'DEP_Annual_Totals.csv'
+fpath <- file.path(sibling, fn)
+the_data <- read_csv(fpath, col_types = 
+                       c(Community = col_character(),
+                         Year = col_integer(),
+                         Volume = col_double(),
+                         Events = col_double(),
+                         Outfalls = col_double()))
 ```
 
-#Total Discharges
-What are our total discharge volumes each year, in MIllions of Gallons?
-```{r}
-tapply(tall.data$Discharge, tall.data$YEAR, sum, na.rm = TRUE)/1000000
+
+# Identify Casco Bay CSO Communities by Name
+
+```{r casco_towns}
+cb_cso_towns <- c("Cape Elizabeth",
+                "Portland & PWD",
+                "South Portland",
+                "Westbrook",
+                "Yarmouth")            
 ```
+
+# Total EEWTF Overflow
+This has to be copied by hand from each report from Portland
+
 Compare that to the Total Portland EEWTF Overflow
 
-Year  Total CSO Overflow	EEWTF Overflow
-2015	221085900           165,380,000
-2016	318,359,690	        178,190,000	
-2017	164,977,000	        211,460,000
-
+```{r}
+EEWTF_overflows <- tribble(
+~Year, ~'Total CSO',	~'EEWTF',
+2015,	  221085900,    165380000,
+2016,	  318359690,	  178190000,
+2017,	  164977000,	  211460000,
+2018,   290485700,    337570000,
+2019,   184453600,	  248450000
+)
+EEWTF_overflows <- EEWTF_overflows %>%
+  mutate(Total           = `Total CSO` + EEWTF,
+         `EEWTF Percent` = round(EEWTF/Total,3)*100)
+knitr::kable(EEWTF_overflows)
+```
 And nominal DAILY discharge of ~ 18 MGD x 365 days....
 
 
-#Summarize Discharges by CSO
+
+# Total Discharges
+What are total discharge volumes each year, in Millions of Gallons?
+```{r}
+the_data %>%
+  group_by(Year) %>%
+  summarize(TotVol      = sum(Volume,   na.rm = TRUE),
+            TotVolMG    = TotVol / (10^6),
+            TotEvents   = sum(Events,   na.rm = TRUE),
+            TotOutfalls = sum(Outfalls, na.rm = TRUE),
+            
+            CBTotVol      = sum(Volume*(Community %in% cb_cso_towns),
+                                na.rm = TRUE),
+            CBVolMG    = CBTotVol / (10^6),
+            CBTotEvents   = sum(Events*(Community %in% cb_cso_towns),
+                                na.rm = TRUE),
+            CBTotOutfalls = sum(Outfalls*(Community %in% cb_cso_towns),
+                                na.rm = TRUE),
+            
+            CBPctVol       = round(CBTotVol / TotVol, 4) * 100,
+            CBPctEvents    = round(CBTotEvents / TotEvents, 4) * 100,
+            CBPctOutfalls  = round(CBTotOutfalls / TotOutfalls, 4) * 100,
+            .groups = 'drop')
+
+```
+
+
+# Summarize Discharges by CSO
 ```{r}
 csosumsandcounts <- tall.data %>% group_by(YEAR,CSO) %>% summarize(discharge = sum(Discharge, na.rm = TRUE), events = sum(Discharge>0, na.rm = TRUE))
 
@@ -61,7 +117,7 @@ CSO_Summary <- csosumsandcounts %>% group_by(CSO) %>% summarize(means = mean(dis
 write.table(CSO_Summary, 'CSO_OutfallCharacteristics.csv', sep = ',')
 ```
 
-##Which CSOs have not discharged in last three years?
+## Which CSOs have not discharged in last three years?
 ```{r}
 tmp <- csosumsandcounts[which(csosumsandcounts$events==0),c(1,2)]
 plot(tmp)

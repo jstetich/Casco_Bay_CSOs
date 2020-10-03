@@ -22,12 +22,12 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
 
 ``` r
 library(tidyverse)
-#> -- Attaching packages ---------------------------------------------------------------------- tidyverse 1.3.0 --
+#> -- Attaching packages --------------------------------------------------------------------- tidyverse 1.3.0 --
 #> v ggplot2 3.3.2     v purrr   0.3.4
 #> v tibble  3.0.3     v dplyr   1.0.2
 #> v tidyr   1.1.2     v stringr 1.4.0
 #> v readr   1.3.1     v forcats 0.5.0
-#> -- Conflicts ------------------------------------------------------------------------- tidyverse_conflicts() --
+#> -- Conflicts ------------------------------------------------------------------------ tidyverse_conflicts() --
 #> x dplyr::filter() masks stats::filter()
 #> x dplyr::lag()    masks stats::lag()
 library(readxl)
@@ -111,9 +111,25 @@ setdiff(dep_2019_Vol_data$Community, dep_2008_Vol_data$Community)
 #> [1] "Cape Elizabeth"             "Hallowell W.D. - 2008 GAUD"
 setdiff(dep_2008_Vol_data$Community, dep_2019_Vol_data$Community)
 #> [1] "Cape Elizabeth (PWD)"     "Hallowell W.D.-2008 GAUD"
+
+setdiff(dep_2019_Event_data$Community, dep_2008_Event_data$Community)
+#> [1] "Cape Elizabeth" "Fort Kent U.D."
+setdiff(dep_2008_Event_data$Community, dep_2019_Event_data$Community)
+#> [1] "Cape Elizabeth (PWD)" "Fort KentU.D."
+
+setdiff(dep_2019_Vol_data$Community, dep_2019_Event_data$Community)
+#> [1] "Westbrook"
+setdiff(dep_2019_Event_data$Community, dep_2019_Vol_data$Community)
+#> [1] "Westbrook (PWD)"
 ```
 
 ``` r
+
+dep_2019_Event_data$Community[dep_2019_Event_data$Community == 
+                              "Westbrook (PWD)"] <- "Westbrook"
+dep_2019_Outfall_data$Community[dep_2019_Outfall_data$Community == 
+                              "Westbrook (PWD)"] <- "Westbrook"
+
 dep_2008_Vol_data$Community[dep_2008_Vol_data$Community == 
                               "Cape Elizabeth (PWD)"] <- "Cape Elizabeth"
 dep_2008_Vol_data$Community[dep_2008_Vol_data$Community == 
@@ -154,17 +170,17 @@ dep_2019_Outfall_data <- dep_2019_Outfall_data %>% select(-`NPDES Permit No.`)
 
 ``` r
 vol_data <- dep_2008_Vol_data %>%
-  select(Community, yr_1997:yr_2004) %>%
+  select(Community, yr_1989:yr_2004) %>%
   full_join(dep_2019_Vol_data, by = 'Community') %>%
-  relocate(c(yr_1987, yr_1988), .before = yr_1997) %>%
+  relocate(c(yr_1987, yr_1988), .before = yr_1989) %>%
   pivot_longer(yr_1987:yr_2019, names_to = 'Year', values_to = 'Volume') %>%
   mutate(Year = as.numeric(substr(Year, 4, 7))) %>%
   filter(Year > 1996) # drop early data that is not accurate.
 
 event_data <- dep_2008_Event_data %>%
-  select(Community, yr_1997:yr_2004) %>%
+  select(Community, yr_1989:yr_2004) %>%
   full_join(dep_2019_Event_data, by = 'Community') %>%
-  relocate(c(yr_1987, yr_1988), .before = yr_1997) %>%
+  relocate(c(yr_1987, yr_1988), .before = yr_1989) %>%
   pivot_longer(yr_1987:yr_2019, names_to = 'Year', values_to = 'Events') %>%
   mutate(Year = as.numeric(substr(Year, 4, 7)))
 
@@ -174,8 +190,9 @@ outfall_data <- dep_2019_Outfall_data %>%
   mutate(Year = as.numeric(substr(Year, 4, 7)))
 
 the_data <- vol_data %>%
-  left_join(event_data, by = c("Community", "Year")) %>%
-  left_join(outfall_data, by = c("Community", "Year"))
+  full_join(event_data, by = c("Community", "Year")) %>%
+  full_join(outfall_data, by = c("Community", "Year"))  %>%
+  arrange(Community, Year)
   
 ```
 

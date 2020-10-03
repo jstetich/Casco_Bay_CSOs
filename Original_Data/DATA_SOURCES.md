@@ -1,33 +1,15 @@
-Data was received in e-mails from Denis Welch, of Portland Water District to
-Curtis C. Bohlen.
+# Sources
 
-Dennis sends monthly summaries of CSO activity to a list of water quality
-stakeholders, including CBEP.
+The Annual Portland Jetport weather data was downloaded from NOAA's
+National Centers for Environmental Information using a small Python program,
+"noaaweatherdataGUI.py", written by CBEP staf.  The program is available
+upon request, or in other data analysis archives related
+to 2020 State of Casco Bay, including
+[CDO-Portland-Jetport](https://github.com/ccb60/CDO-Portland-Jetport).
 
-December reports each year contain data for the previous 12 months, providing a
-convenient annual summary.
+Data was downloaded to the file "Annual_Weather_PWD.csv" in "Long" format,
+based on the "GSOY", or Global Summary of the Year data format.  Annual
+total precipitation, the only value used here, is "PRCP".
 
-2016, 2017, and 2018 data were in CCB e-mail archives.  The 2015 data was found
-in archives used for preparing the Nutrient Council report several years ago. 
-Older e-mails have apparently been deleted automatically from GMail.
-
-A request for complete 2019 data was sent to Denis Welch on September 30, 2020.
-He responded October 1 with the 2019 file.
-
-Portland CSO Data came from from e-mails from Dennis Welch, of PWD, sent
-
-*  1/11/2016,  
-*  3/2/2017,   
-*  1/26/2018,   
-*  1/30/2019,
-*  10/01/2020.
-
-These emails are archived in CCB's e-mails under
-"Nutrients and water quality / CSOs", but apparently, older e-mails are
-automatically deleted from GMail.
-
-E-mails contain both CSO volume and rainfall data, in excel spreadsheets.
-
-Notice that the data from 2015 uses a slightly different data format.  It is
-structured with a row for each DAY within events.  All other data sheets have a
-row for each EVENT, with a start date and an end date.
+Data documentation can be found here:
+https://www.ncdc.noaa.gov/cdo-web/datasets

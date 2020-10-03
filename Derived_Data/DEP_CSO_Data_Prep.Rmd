@@ -78,8 +78,20 @@ dep_2008_Event_data <- read_excel("2008_Report_Data.xlsx",
 ```{r names_1}
 setdiff(dep_2019_Vol_data$Community, dep_2008_Vol_data$Community)
 setdiff(dep_2008_Vol_data$Community, dep_2019_Vol_data$Community)
+
+setdiff(dep_2019_Event_data$Community, dep_2008_Event_data$Community)
+setdiff(dep_2008_Event_data$Community, dep_2019_Event_data$Community)
+
+setdiff(dep_2019_Vol_data$Community, dep_2019_Event_data$Community)
+setdiff(dep_2019_Event_data$Community, dep_2019_Vol_data$Community)
 ```
 ```{r names_2}
+
+dep_2019_Event_data$Community[dep_2019_Event_data$Community == 
+                              "Westbrook (PWD)"] <- "Westbrook"
+dep_2019_Outfall_data$Community[dep_2019_Outfall_data$Community == 
+                              "Westbrook (PWD)"] <- "Westbrook"
+
 dep_2008_Vol_data$Community[dep_2008_Vol_data$Community == 
                               "Cape Elizabeth (PWD)"] <- "Cape Elizabeth"
 dep_2008_Vol_data$Community[dep_2008_Vol_data$Community == 
@@ -115,17 +127,17 @@ dep_2019_Outfall_data <- dep_2019_Outfall_data %>% select(-`NPDES Permit No.`)
 
 ```{r build_data}
 vol_data <- dep_2008_Vol_data %>%
-  select(Community, yr_1997:yr_2004) %>%
+  select(Community, yr_1989:yr_2004) %>%
   full_join(dep_2019_Vol_data, by = 'Community') %>%
-  relocate(c(yr_1987, yr_1988), .before = yr_1997) %>%
+  relocate(c(yr_1987, yr_1988), .before = yr_1989) %>%
   pivot_longer(yr_1987:yr_2019, names_to = 'Year', values_to = 'Volume') %>%
   mutate(Year = as.numeric(substr(Year, 4, 7))) %>%
   filter(Year > 1996) # drop early data that is not accurate.
 
 event_data <- dep_2008_Event_data %>%
-  select(Community, yr_1997:yr_2004) %>%
+  select(Community, yr_1989:yr_2004) %>%
   full_join(dep_2019_Event_data, by = 'Community') %>%
-  relocate(c(yr_1987, yr_1988), .before = yr_1997) %>%
+  relocate(c(yr_1987, yr_1988), .before = yr_1989) %>%
   pivot_longer(yr_1987:yr_2019, names_to = 'Year', values_to = 'Events') %>%
   mutate(Year = as.numeric(substr(Year, 4, 7)))
 
@@ -135,8 +147,9 @@ outfall_data <- dep_2019_Outfall_data %>%
   mutate(Year = as.numeric(substr(Year, 4, 7)))
 
 the_data <- vol_data %>%
-  left_join(event_data, by = c("Community", "Year")) %>%
-  left_join(outfall_data, by = c("Community", "Year"))
+  full_join(event_data, by = c("Community", "Year")) %>%
+  full_join(outfall_data, by = c("Community", "Year"))  %>%
+  arrange(Community, Year)
   
 
 ```
