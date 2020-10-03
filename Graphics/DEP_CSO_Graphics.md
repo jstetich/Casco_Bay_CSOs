@@ -24,7 +24,6 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
       - [Total Discharges](#total-discharges)
       - [Total Outfalls](#total-outfalls)
           - [Regression to Extract Slope](#regression-to-extract-slope)
-      - [Total Outfalls](#total-outfalls-1)
       - [Total Events (NOT)](#total-events-not)
   - [Summary Table](#summary-table)
 
@@ -253,7 +252,7 @@ What jumps out is:
 ``` r
 cb_cso_lm <- lm(CSO_MG_per_inch ~ Year, data = annual_data_all)
 #summary(cb_cso_lm)
-slope = round(coef(cb_cso_lm)[2],2)
+slope = round(coef(cb_cso_lm)[2],1)
 theannot <- paste( slope, 'MG per inch per year')
 ```
 
@@ -340,7 +339,7 @@ plt +
   scale_y_continuous(labels = scales::number,sec.axis = sec_axis(~ . / 25,
                                          name = "Annual Rainfall (in)")) +
   theme(legend.position = 'bottom',
-        legend.text = element_text(size = 9))
+        legend.text = element_text(size = 8))
 #> `geom_smooth()` using formula 'y ~ x'
 #> Warning: Removed 17 rows containing missing values (position_stack).
 ```
@@ -348,9 +347,7 @@ plt +
 ![](DEP_CSO_Graphics_files/figure-gfm/add_annotations-1.png)<!-- -->
 
 ``` r
-ggsave('figures/CSO_town_area.pdf', device = cairo_pdf, width = 7, height = 5)
-#> `geom_smooth()` using formula 'y ~ x'
-#> Warning: Removed 17 rows containing missing values (position_stack).
+#ggsave('figures/CSO_town_area.pdf', device = cairo_pdf, width = 7, height = 5)
 ```
 
 ## Total Discharges
@@ -360,9 +357,6 @@ plt <-annual_data_all %>%
   ggplot(aes(x = Year, y = CBVolMG)) + 
   geom_line() +
   ylab('CSO Volume\n(millions of gallons)') +
-  geom_line(mapping = aes(y = Precip_in * 25), 
-            color = cbep_colors()[5],
-            lwd = 1) +
   geom_smooth(mapping = aes(y=CBVolMG),
               method = 'lm', se=FALSE,
               color = cbep_colors()[3],
@@ -371,12 +365,7 @@ plt <-annual_data_all %>%
   geom_text(aes(x=2013, y=600, label = theannot),
             family = 'Montserrat',
             size = 4,
-            hjust = 0) +
-  scale_y_continuous(labels = scales::number,sec.axis = sec_axis(~ . / 25,
-                                         name = "Annual Rainfall (in)")) +
-  theme(axis.title.y.right = element_text(color = cbep_colors()[5]),
-        axis.text.y.right = element_text(color = cbep_colors()[5]),
-        axis.ticks.y.right = element_line(color = cbep_colors()[5])                              )
+            hjust = 0)
 plt
 #> `geom_smooth()` using formula 'y ~ x'
 ```
@@ -385,6 +374,25 @@ plt
 
 ``` r
 ggsave('figures/CSO_total_line.pdf', device = cairo_pdf, width = 7, height = 5)
+#> `geom_smooth()` using formula 'y ~ x'
+```
+
+``` r
+plt +
+  geom_line(mapping = aes(y = Precip_in * 25), 
+            color = cbep_colors()[5]) +
+  scale_y_continuous(labels = scales::number,sec.axis = sec_axis(~ . / 25,
+                                         name = "Annual Rainfall (in)")) +
+  theme(axis.title.y.right = element_text(color = cbep_colors()[5]),
+        axis.text.y.right = element_text(color = cbep_colors()[5]),
+        axis.ticks.y.right = element_line(color = cbep_colors()[5]))
+#> `geom_smooth()` using formula 'y ~ x'
+```
+
+![](DEP_CSO_Graphics_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
+
+``` r
+ggsave('figures/CSO_total_line_w_rain.pdf', device = cairo_pdf, width = 7, height = 5)
 #> `geom_smooth()` using formula 'y ~ x'
 ```
 
@@ -471,7 +479,7 @@ plt <-annual_data_all %>%
             size = 4,
             hjust = 0) +
   xlim(c(2000, 2020)) +
-  ylim(c(0,50))
+  ylim(c(20,50))
 plt
 #> `geom_smooth()` using formula 'y ~ x'
 ```
@@ -481,36 +489,6 @@ plt
 ``` r
 ggsave('figures/CSO_outfalls_points.pdf', device = cairo_pdf, width = 7, height = 5)
 #> `geom_smooth()` using formula 'y ~ x'
-```
-
-## Total Outfalls
-
-``` r
-cb_outfalls_lm <- lm(CBTotOutfalls ~ Year,
-                     data = annual_data_all,
-                     subset = Year>2001)
-summary(cb_outfalls_lm)
-#> 
-#> Call:
-#> lm(formula = CBTotOutfalls ~ Year, data = annual_data_all, subset = Year > 
-#>     2001)
-#> 
-#> Residuals:
-#>      Min       1Q   Median       3Q      Max 
-#> -1.84761 -0.43662  0.04558  0.61679  1.22360 
-#> 
-#> Coefficients:
-#>              Estimate Std. Error t value Pr(>|t|)    
-#> (Intercept) 977.89095   74.42189   13.14 5.47e-10 ***
-#> Year         -0.46440    0.03702  -12.55 1.08e-09 ***
-#> ---
-#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#> 
-#> Residual standard error: 0.8148 on 16 degrees of freedom
-#> Multiple R-squared:  0.9077, Adjusted R-squared:  0.902 
-#> F-statistic: 157.4 on 1 and 16 DF,  p-value: 1.077e-09
-slope = coef(cb_outfalls_lm)[2]
-theannot <- paste('Eliminating an outfall every', -round(1/slope,1), 'years')
 ```
 
 ## Total Events (NOT)

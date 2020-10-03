@@ -187,7 +187,7 @@ correlated with the other variables, but that
 ```{r volume_regression}
 cb_cso_lm <- lm(CSO_MG_per_inch ~ Year, data = annual_data_all)
 #summary(cb_cso_lm)
-slope = round(coef(cb_cso_lm)[2],2)
+slope = round(coef(cb_cso_lm)[2],1)
 theannot <- paste( slope, 'MG per inch per year')
 ```
 
@@ -260,8 +260,8 @@ plt +
   scale_y_continuous(labels = scales::number,sec.axis = sec_axis(~ . / 25,
                                          name = "Annual Rainfall (in)")) +
   theme(legend.position = 'bottom',
-        legend.text = element_text(size = 9))
-ggsave('figures/CSO_town_area.pdf', device = cairo_pdf, width = 7, height = 5)
+        legend.text = element_text(size = 8))
+#ggsave('figures/CSO_town_area.pdf', device = cairo_pdf, width = 7, height = 5)
 ```
 
 ## Total Discharges
@@ -270,9 +270,6 @@ plt <-annual_data_all %>%
   ggplot(aes(x = Year, y = CBVolMG)) + 
   geom_line() +
   ylab('CSO Volume\n(millions of gallons)') +
-  geom_line(mapping = aes(y = Precip_in * 25), 
-            color = cbep_colors()[5],
-            lwd = 1) +
   geom_smooth(mapping = aes(y=CBVolMG),
               method = 'lm', se=FALSE,
               color = cbep_colors()[3],
@@ -281,15 +278,25 @@ plt <-annual_data_all %>%
   geom_text(aes(x=2013, y=600, label = theannot),
             family = 'Montserrat',
             size = 4,
-            hjust = 0) +
+            hjust = 0)
+plt
+ggsave('figures/CSO_total_line.pdf', device = cairo_pdf, width = 7, height = 5)
+```
+
+```{r}
+plt +
+  geom_line(mapping = aes(y = Precip_in * 25), 
+            color = cbep_colors()[5]) +
   scale_y_continuous(labels = scales::number,sec.axis = sec_axis(~ . / 25,
                                          name = "Annual Rainfall (in)")) +
   theme(axis.title.y.right = element_text(color = cbep_colors()[5]),
         axis.text.y.right = element_text(color = cbep_colors()[5]),
-        axis.ticks.y.right = element_line(color = cbep_colors()[5])                              )
-plt
-ggsave('figures/CSO_total_line.pdf', device = cairo_pdf, width = 7, height = 5)
+        axis.ticks.y.right = element_line(color = cbep_colors()[5]))
+ggsave('figures/CSO_total_line_w_rain.pdf', device = cairo_pdf, width = 7, height = 5)
 ```
+
+
+
 
 ```{r total_graphics_area}
 plt <-annual_data_all %>%
@@ -363,20 +370,11 @@ plt <-annual_data_all %>%
             size = 4,
             hjust = 0) +
   xlim(c(2000, 2020)) +
-  ylim(c(0,50))
+  ylim(c(20,50))
 plt
 ggsave('figures/CSO_outfalls_points.pdf', device = cairo_pdf, width = 7, height = 5)
 ```
 
-## Total Outfalls
-```{r}
-cb_outfalls_lm <- lm(CBTotOutfalls ~ Year,
-                     data = annual_data_all,
-                     subset = Year>2001)
-summary(cb_outfalls_lm)
-slope = coef(cb_outfalls_lm)[2]
-theannot <- paste('Eliminating an outfall every', -round(1/slope,1), 'years')
-```
 
 ## Total Events (NOT)
 Total Events makes little sense, since we can't reconstruct which day each
