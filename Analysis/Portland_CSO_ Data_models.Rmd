@@ -1,5 +1,5 @@
 ---
-title: "Casco Bay CSO Data Analysis, based on DEP Annual Reports"
+title: "Casco Bay CSO Data Analysis, Patterns with Rainfall"
 author: Curtis C. Bohlen, Casco Bay Estuary Partnership
 output:
   github_document:
@@ -16,10 +16,11 @@ output:
   knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 ```
 
-
 #Load Libraries
 ```{r load_libraries}
 library(tidyverse)
+library(gridExtra)
+library(corrplot)
 
 library(CBEPgraphics)
 load_cbep_fonts()
@@ -27,41 +28,93 @@ theme_set(theme_cbep())
 
 ```
 
-# Establish Folder Reference
+# Load Data
+## Establish Folder References
 ```{r folder_references}
 sibfldnm <- 'Derived_Data'
 parent   <- dirname(getwd())
 sibling  <- file.path(parent,sibfldnm)
 
+dir.create(file.path(getwd(), 'figures'), showWarnings = FALSE)
 ```
 
-# Load Data
-```{r}
-fn <-'DEP_Annual_Totals.csv'
+## Load Core Data
+```{r load_data}
+fn <-'Portland_CSO_data_2015_2019.csv'
 fpath <- file.path(sibling, fn)
 the_data <- read_csv(fpath, col_types = 
-                       c(Community = col_character(),
-                         Year = col_integer(),
-                         Volume = col_double(),
-                         Events = col_double(),
-                         Outfalls = col_double()))
+                       cols(.default = col_double(),
+                                 firstdate = col_date(format = ""),
+                                 lastdate = col_date(format = ""))) %>%
+  select (-event)    # event only applies within years, and has no purpose here.
+
 ```
 
-
-# Identify Casco Bay CSO Communities by Name
-
-```{r casco_towns}
-cb_cso_towns <- c("Cape Elizabeth",
-                "Portland & PWD",
-                "South Portland",
-                "Westbrook",
-                "Yarmouth")            
+## Load Locations Lookup Table
+```{r load_locations}
+fn <-'Portland_Locations.csv'
+fpath <- file.path(sibling, fn)
+locations_lookup <- read_csv(fpath, col_types = 
+                             cols(CSO = col_character(),
+                                  Location = col_character()))
 ```
 
-# Total EEWTF Overflow
-This has to be copied by hand from each report from Portland
+## Load Weather Data
+### Establish Folder Reference
+```{r folder_references_2}
+sibfldnm <- 'Original_Data'
+parent   <- dirname(getwd())
+sibling  <- file.path(parent,sibfldnm)
+```
 
-Compare that to the Total Portland EEWTF Overflow
+### Access data
+We extract annual Precipitation Totals (in mm), and Annual Days with more than
+one tenth of an inch (2.5mm), and one inch (25.4mm) of rain from the annual
+weather summaries from NOAA.
+```{r rain_data}
+fn <-'Annual_Weather_PWD.csv'
+fpath <- file.path(sibling, fn)
+rain_data <- read_csv(fpath, col_types =
+                       cols(date = col_datetime(format = ""),
+                            datatype = col_character(),
+                            value = col_double(),
+                            attributes = col_character(),
+                            station = col_skip())) %>%
+  mutate(Year = as.integer(format(date, format = '%Y'))) %>%
+  filter (datatype %in% c('PRCP', 'DP10', 'DP1X')) %>%
+  select(Year, datatype, value) %>%
+  pivot_wider(names_from = datatype, values_from = value) %>%
+  rename(Precip_mm = PRCP, GT0.1 = DP10, GT1.0 = DP1X) %>%
+  mutate(Precip_in = Precip_mm / 25.4) %>%
+  filter(Year > 1996)
+```
+
+## Calculate Totals by Year
+The CALCULATED total volumes here incorporate some data corrections from 2019
+that were missed in the source Excel File, so `eventtotal` and `calcvolume` do
+not match exactly.
+```{r annual_totals}
+totals_by_year <- the_data %>%
+  mutate(calcvolume  = rowSums(.[grep("CSO", names(.))], na.rm = TRUE)) %>%
+  select(-contains('CSO')) %>%
+  group_by(Year) %>%
+  summarize(annualstormprecip = sum(totalprecip),
+            annualreportvol = sum(eventtotal),
+            annualcalcvol =  sum(calcvolume),
+            annualevents = sum(! is.na(calcvolume)),
+            .groups = 'drop') %>%
+  left_join(rain_data)
+totals_by_year
+```
+
+### Total EEWTF Overflow
+Data on total annual EEWWTF bypass flows was copied by hand from each report
+from Portland Water District.
+
+Note that the total CSO volume we show here for 2019 is slightly different
+from the total reported in the Excel file, as that file included two events 
+from January of 2020.  We have dropped those from our analyses.  It is not clear
+whether that invalidates the comparison to the EEWTF bypass flows.
 
 ```{r}
 EEWTF_overflows <- tribble(
@@ -70,127 +123,72 @@ EEWTF_overflows <- tribble(
 2016,	  318359690,	  178190000,
 2017,	  164977000,	  211460000,
 2018,   290485700,    337570000,
-2019,   184453600,	  248450000
+2019,   127921700,	  248450000
 )
 EEWTF_overflows <- EEWTF_overflows %>%
   mutate(Total           = `Total CSO` + EEWTF,
          `EEWTF Percent` = round(EEWTF/Total,3)*100)
-knitr::kable(EEWTF_overflows)
+
+EEWTF_overflows %>%
+  mutate(`Total CSO` = round(`Total CSO`/(10^6),2),
+         EEWTF       = round( EEWTF     /(10^6),2),
+         Total       = round( Total     /(10^6),2)) %>%
+  knitr::kable(align = c('lrrrc'))
 ```
-And nominal DAILY discharge of ~ 18 MGD x 365 days....
+For comparison purposes, it is worth recalling that the EEWTF is licensed to
+discharge ~ 18 MGD.  On an annual basis, that would work out to 
+$18 \times 365 = 6,570$ million gallons, or substantially more than an order of 
+magnitude higher.
 
-
-
-# Total Discharges
-What are total discharge volumes each year, in Millions of Gallons?
+## Combine Annual Totals
 ```{r}
-the_data %>%
-  group_by(Year) %>%
-  summarize(TotVol      = sum(Volume,   na.rm = TRUE),
-            TotVolMG    = TotVol / (10^6),
-            TotEvents   = sum(Events,   na.rm = TRUE),
-            TotOutfalls = sum(Outfalls, na.rm = TRUE),
-            
-            CBTotVol      = sum(Volume*(Community %in% cb_cso_towns),
-                                na.rm = TRUE),
-            CBVolMG    = CBTotVol / (10^6),
-            CBTotEvents   = sum(Events*(Community %in% cb_cso_towns),
-                                na.rm = TRUE),
-            CBTotOutfalls = sum(Outfalls*(Community %in% cb_cso_towns),
-                                na.rm = TRUE),
-            
-            CBPctVol       = round(CBTotVol / TotVol, 4) * 100,
-            CBPctEvents    = round(CBTotEvents / TotEvents, 4) * 100,
-            CBPctOutfalls  = round(CBTotOutfalls / TotOutfalls, 4) * 100,
-            .groups = 'drop')
-
+totals_by_year <- totals_by_year %>%
+  left_join(EEWTF_overflows, by = 'Year') %>%
+  select(-annualreportvol, -Precip_mm, -Total, -`EEWTF Percent`)
 ```
 
+## Revised data
+```{r]}
+CSO <- the_data %>% 
+  select(firstdate, totalprecip, maxprecip, everything()) %>%
 
-# Summarize Discharges by CSO
-```{r}
-csosumsandcounts <- tall.data %>% group_by(YEAR,CSO) %>% summarize(discharge = sum(Discharge, na.rm = TRUE), events = sum(Discharge>0, na.rm = TRUE))
-
-CSO_Summary <- csosumsandcounts %>% group_by(CSO) %>% summarize(means = mean(discharge, na.rm=TRUE), sds = sd(discharge, na.rm = TRUE),
-                                                       meancount = mean(events, na.rm=TRUE), sdcount = sd(events, na.rm = TRUE))
-
-write.table(CSO_Summary, 'CSO_OutfallCharacteristics.csv', sep = ',')
+  select (firstdate, Year, days, everything(), -eventtotal, -lastdate) %>%
+  pivot_longer(cols = CSO_002:CSO_042,
+               names_to = 'CSO',
+               values_to = 'Volume') %>%
+  mutate(Volume = Volume/(10^6)) %>%
+  left_join(locations_lookup, by = 'CSO') %>%
+  group_by(Year, CSO) %>%
+  summarize(Location = first(Location),
+            Events = sum(Volume>0, na.rm = TRUE),
+            Volume = sum(Volume, na.rm = TRUE),
+            .groups = 'drop') %>%
 ```
 
-## Which CSOs have not discharged in last three years?
-```{r}
-tmp <- csosumsandcounts[which(csosumsandcounts$events==0),c(1,2)]
-plot(tmp)
+# Exploratory Data Analysis
+## Correlations by Event
+```{r correlation_figure}
+cors <- totals_by_event %>%
+  select(3:8) %>%
+  cor(use = 'pairwise')
+corrplot(cors, method="circle", type = 'upper')
+rm(cors)
 ```
 
-##Which CSOs have discharged once a year or less?
-```{r}
-CSO_Summary$CSO[which(CSO_Summary$meancount<=3)]
-```
-
-##Which CSOs have not discharged in EACH of the last  three years?
-```{r}
-tall.data$CSO[which(CSO_Summary$means==0)]
-```
-
-
-
-##Plot a histogram showing the distibution of discharges
-```{r}
-plt <- ggplot(CSO_Summary) + aes(means/1000000) + geom_histogram(bins = 20) + xlab("Mean Annual Discharge (MG)") + ggtitle('Portland CSO Discharges by Outfall 2015-2017')
-plt
-```
-
-
-##Try to fit a gGAMMA distribution.  Not very satisfactory....
-```{r}
-plt <- ggplot(CSO_Summary) + aes(means/1000000) + geom_histogram(aes(y=..density..), bins = 20) + xlab("Mean Annual Discharge (MG)") + ggtitle('Portland CSO Discharges by Outfall 2015-2017')
-plt <- plt + stat_density(colour="blue", geom="line", position="identity") +
-  #stat_function(fun=dnorm, args=list(mean=mean(CSO_Summary$means/1000000), sd=sd(CSO_Summary$means/1000000))) +
-  stat_function(fun=dgamma, args=list(shape=mean(CSO_Summary$means/1000000)^2/sd(CSO_Summary$means/1000000)^2, scale=sd(CSO_Summary$means/1000000)^2/mean(CSO_Summary$means/1000000)), color = 'red')
-plt
-```
-
-
-```{r}
-plt <- ggplot(CSO_Summary) + aes(meancount) + geom_histogram(binwidth = 2) + xlab("Mean Annual Number of Discharge Events") + ggtitle('Portland CSO Discharge Events by Outfall 2015-2017')
-plt
-```
-
-##Plot the relationship betwen TOTAL discharges and the NUMBER Of discharges for each Outfall
-```{r}
-plt <- ggplot(CSO_Summary) + aes(meancount, means/1000000) + geom_point() + geom_smooth(method = 'lm')
-plt <- plt + xlab("Mean Annual Number of Discharge Events")  + ylab("Mean Annual Discharge (MG)") + ggtitle('Portland CSO Discharges by Outfall 2015-2017')
-plt <- plt + scale_y_log10(limits = c(0.1,100), breaks = c(0.1,1,10, 100))
-plt
-```
-
-##Plot discharge behavior for each outfall
-```{r, fig1, fig.width=6,fig.height=6}
-plt <- ggplot(csosumsandcounts) + aes(discharge/1000000, CSO, color = YEAR) + geom_point() + xlab("Total Annual Discharge (MG)") + ggtitle('Portland CSO Discharges 2015-2017') + scale_x_log10(limits = c(0.1,100), breaks = c(0.1,1,10, 100))
-plt
-```
-
-
-```{r, fig2, fig.width=6,fig.height=6}
-plt <- ggplot(csosumsandcounts) + aes(events, CSO, color = YEAR) + geom_point() + xlab("Number of Discharge Events") + ggtitle('Portland CSO Discharges 2015-2017')
-plt
-```
-
-##Relationship betwwen annual discharge and annual number of discharge events accross all outfalls and years.
-```{r, fig3, fig.width=6,fig.height=6}
-plt <- ggplot(csosumsandcounts) + geom_point(aes(discharge/1000000, events, shape = YEAR , color= CSO)) + geom_smooth(aes(discharge/1000000, events), method = 'lm')
-plt <- plt + xlab("Total Annual Discharge (MG)") + ylab('Number of Discharge Events') + ggtitle('Portland CSO Discharges 2015-2017')
-plt <- plt + scale_x_log10() + scale_y_log10()
-plt
-```
+So all metrics of storm intensity and CSO magnitude are positively correlated.
+Event-related CSO volume is most closely correlated with total precipitation
+rather than the peak storm intensity.
 
 
 #Looking for patterns in relationship to rainfall
 ##Annual rainfall Patterns
 Note a large storm in 2015.
 ```{r}
-plt <- ggplot(wide.data) + aes(YEAR, totprecip) + geom_violin() + ylab("Total Precipitation During Storm Event (in)") + scale_y_log10(limits =c(0.1, 10))
+plt <- the_data %>%
+  ggplot(aes(Year, totalprecip)) +
+  geom_violin() +
+  ylab("Total Precipitation During Storm Event (in)") +
+  scale_y_log10(limits =c(0.1, 10))
 plt
 ```
 

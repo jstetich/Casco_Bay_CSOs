@@ -42,7 +42,6 @@ Two other CSO locations were frequently not monitored:
 
 Results from these five CSOs should be used with caution for 2015.
 
-
 # Data From DEP Annual CSO Reports
 We accessed data from the 2008, 2016, and 2019 Annual CSO Reports, as described
 in the DATA_SOURCES.md page under Original_Data. We relied most closely on the
@@ -53,7 +52,8 @@ report. Because these are PDF documents, extracting the data without errors is
 slightly tricky.
 
 ## Extracting Data to Excel Files
-We extracted data to Excel Files for further processing as follows: 
+We extracted data to Excel Files for further processing as follows:
+
 ### Data From the 2019 Report 
 1. Copy the entire table from the PDF, and paste it into Word. The formatting
    is somewhat awkward, but it is all there.  
@@ -74,9 +74,10 @@ We extracted data to Excel Files for further processing as follows:
    not be copied successfully from the PDF, so data was copied by hand and typed
    manually into the spreadsheet.
 
-WE accessed data from the 2008 report, which CBEP has in our archives, to
+We accessed data from the 2008 report, which CBEP has in our archives, to
 provide older data. Users should be cautious, as some of the older data (prior
-to about 1997) is estimated, and considered unreliable. 
+to about 1997) is estimated, and considered unreliable. Wedo not report on
+that older data in the 2020 Report because of uncertainty about its reliability.
 
 ### Data From the 2008 Report
 Unfortunately, the older report was prepared slightly differently, and copying
@@ -98,51 +99,44 @@ fully delimited.
    totals rows will be misaligned.
 
 
-## Processing Files for Analysis in R.
+# GIS Data
+## Spurce
+The original geospatial data was downloaded on September 12, 2019 by
+Curtis C. Bohlen, from:
+https://geolibrary-maine.opendata.arcgis.com/datasets/mainedep-cso.
+The equivalent data has since moved to:
+https://hub.arcgis.com/datasets/maine::mainedep-cso
 
+This file contains a statewide CSO data layer, derived from permit data.
+The file includes both "Active" and "Inactive" CSOs.
 
+## We noted the following: 
+* Unlike data downloaded in previous years, the "STATUS" of all outfalls was
+  "ACTIVE"
+*  "OUTFALL_ID" in this data set is NOT unique -- the ID numbers (here as
+strings, not numeric values) are apparently unique only within towns.
+*  "OUTFALL_NA" in Portland does not always precisely match the names in the
+Portland data we received from PWD.
 
-
-
-# Altering GIS files to match the PWD data
-
-Working from "Casco_Bay_CSOs_2", recently prepared from DEP on-line GIS data
-files. Data downloaded May 29, imported as event layer, and converted to
-shapefile.
-
-Note that these GIS files also provide ID numbers, unique within towns.
-Partial matching shows that the numbers in the GIS data (Derived from DEP data)
-appear to line up with the numbers presented in the Portland CSO discharge data.
-However, there are a couple of CSOs that don't line up.
-
-CSO 35 and CSO 36 and are included in the GIS data, but not in the discharge
-data. They are labeled in the GIS data as not active, so it makes sense that
-they would not be monitored by PWD.
-
-CSO 42 and 43 -- the Warren Ave, Capisic Brook discharges -- are not included in
-the GIS data, but are included in discharge data. CSO 042 is included in all
-three years.  CSO 043 is included in the 2015 and 2016 data, but with no
-reported discharges.
-
-I copied data on CSO 42 from the CSO data layer in our 2015 SotB data archive,
-and added it to "Casco_Bay_CSOs_2", creating "Casco_Bay_CSOs_3".
-
-Finally, I simplified the attributes, by removing several data columns that I
-don't need for now.
-
- 
-
-# Preparation of Statewide CSO data for regional totals
-
-(1) Downloaded 2017 CSO report from DEP. "2017_status_report.pdf"
-(2) Copied tables from the PDF file using simple copy.  Format of data not
-directly importable into Excel as tables.
-(3) imported into Excel file , "CSO data Discharge from 2017 State CSO
-Report.xlsx"  Import by pasteing data and rearranging, or via a python
-script that reordered data to simplify the task.  In either case, mport
-required hand corrections.
-(4) Checked that all calculated annual totals matched totals provided in the PDF.
-(5) COnstructed pivot tables to extract annual total discharges from Casco Bay
-CSO communities.
-
+## Processing
+1.  We used ArcGIS to select CSO locations in the Casco Bay region, and saved them
+    in a shapefile "Regional_CSOs".   
+2,  To facilitate working with Portland's CSOs, for which we have detailed
+    storm by storm discharge data, we exported a "Portland only" subset of the
+    data as the "Portland_CSOs" shapefile.  
+3.  We simplified the attribute table in "Portland_CSOs"" by removing
+    uninformative and minimally informative attributes.  
+4.  We added a new attribute, "Town", which removes extraneous details from each
+    "FACILITY_N", combines PWD and Portland DPW outfalls (to "Portland"), and
+    renames towns in standard capitalization.  
+5.  We added a new (calculated) attribute with the form "CSO_###", which matches
+    the nomenclature used in the Portland-specific CSO discharge data from 
+    2015 through 2019.  
+6.  we imported the file "portland_Cso_summary.csv", which was produced in R, to
+    ArcGIS, and "Joined"" it to the "Portland_CSOs" layer.
+7.  We then created new attributes and transferred the data to the
+    "Portland_CSOs" shapefile, thus adding data on CSO frequency and magnitude
+    to the shapefile.  The presence of location names offers a chance to double
+    check the text-based merge to make sure data was assigned to teh correct
+    CSO location.
 

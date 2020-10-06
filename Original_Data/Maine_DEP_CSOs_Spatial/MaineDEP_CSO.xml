@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?><metadata>
+<idinfo>
+<citation>
+<citeinfo>
+<origin/>
+<pubdate>20190225</pubdate>
+<title>MaineDEP CSO</title>
+<onlink>https://gis.maine.gov/arcgis/rest/services/dep/MainePollutantDischargeEliminationSystem/MapServer/2</onlink>
+</citeinfo>
+</citation>
+<descript>
+<abstract>This data shows the location of active and closed CSO outfall pipes licensed under the Maine Pollution Discharge Elimination System (MEPDES).  Data was collected for this
+project under two separate contracts and was overseen by the Maine Department of Environmental Protection (MEDEP). Part 1 was from 1998 to 1999 under a Geo-graphics contract and Part 2 was from 2000 to 2001 under a contract with Northern Ecological Associates. Data was collected using Trimble Pro-XR GPS receivers that have corrected accuracy of +/- 1 meter. Since the original data collection, MEDEP staff have maintained the layer.  During the fall and winter of 2018, a water quality environmental engineer reviewed the CSO data for completeness and location quality, prior to public re-release.</abstract>
+<purpose>This data shows the location of active and closed CSO outfall pipes licensed under the Maine Pollution Discharge Elimination System (MEPDES).</purpose>
+</descript>
+<timeperd>
+<timeinfo>
+<rngdates>
+<begdate>20190225</begdate>
+<enddate>20190831</enddate>
+</rngdates>
+</timeinfo>
+<current>Data updates in February and August.</current>
+</timeperd>
+<status>
+<progress>In work</progress>
+<update>Biannually</update>
+</status>
+<spdom>
+<bounding>
+<westbc>-71.2429</westbc>
+<eastbc>-66.7165</eastbc>
+<northbc>47.532</northbc>
+<southbc>42.8921</southbc>
+</bounding>
+</spdom>
+<keywords>
+<theme>
+<themekt>ISO 19115 Topic Categories</themekt>
+<themekey>environment</themekey>
+<themekey>inlandWaters</themekey>
+</theme>
+<theme>
+<themekt>None</themekt>
+<themekey>Maine DEP</themekey>
+<themekey>Maine Department of Environmental Protection</themekey>
+<themekey>MaineDEP</themekey>
+<themekey>Maine Water Quality</themekey>
+<themekey>environment</themekey>
+<themekey>MEPDES</themekey>
+<themekey>Maine</themekey>
+<themekey>GeoLibrary</themekey>
+<themekey>inlandwaters</themekey>
+</theme>
+</keywords>
+<accconst>None</accconst>
+<useconst>None</useconst>
+</idinfo>
+<metainfo>
+<metd>20190225</metd>
+<metc>
+<cntinfo>
+<cntorgp>
+<cntorg>Maine Department of Environmental Protection</cntorg>
+</cntorgp>
+<cntpos>GIS Manager</cntpos>
+<cntaddr>
+<addrtype>mailing and physical</addrtype>
+<address>28 Tyson Dr, 17 State House Station</address>
+<city>August</city>
+<state>Maine</state>
+<postal>04333</postal>
+<country>US</country>
+</cntaddr>
+<cntvoice>207-287-7688</cntvoice>
+</cntinfo>
+</metc>
+<metstdn>FGDC Content Standard for Digital Geospatial Metadata</metstdn>
+<metstdv>FGDC-STD-001-1998</metstdv>
+<mettc>local time</mettc>
+</metainfo>
+</metadata>

@@ -16,10 +16,11 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
       - [Read in 2015 Data](#read-in-2015-data)
           - [List Locations](#list-locations)
           - [Read 2015 Data](#read-2015-data)
+          - [Error Correction](#error-correction)
           - [Reprocess to Match Other File
             Format](#reprocess-to-match-other-file-format)
-          - [Which CSOs Were Monitoried All Year in
-            2015?](#which-csos-were-monitoried-all-year-in-2015)
+          - [Which CSOs Were Monitored All Year in
+            2015?](#which-csos-were-monitored-all-year-in-2015)
       - [Read the Other Files](#read-the-other-files)
           - [2016 Data](#data)
           - [2017 Data](#data-1)
@@ -28,6 +29,9 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
   - [Save Five Years of Portland CSO Event
     Data](#save-five-years-of-portland-cso-event-data)
       - [Combine Data](#combine-data-1)
+  - [Export Data for GIS](#export-data-for-gis)
+      - [Calculate Totals by CSO](#calculate-totals-by-cso)
+      - [Export File](#export-file)
 
 <img
     src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
@@ -39,14 +43,14 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
 library(tidyverse)
 ```
 
-    ## -- Attaching packages ---------------------------------------------------------------------- tidyverse 1.3.0 --
+    ## -- Attaching packages ------------------------------------------------------------------- tidyverse 1.3.0 --
 
     ## v ggplot2 3.3.2     v purrr   0.3.4
     ## v tibble  3.0.3     v dplyr   1.0.2
     ## v tidyr   1.1.2     v stringr 1.4.0
     ## v readr   1.3.1     v forcats 0.5.0
 
-    ## -- Conflicts ------------------------------------------------------------------------- tidyverse_conflicts() --
+    ## -- Conflicts ---------------------------------------------------------------------- tidyverse_conflicts() --
     ## x dplyr::filter() masks stats::filter()
     ## x dplyr::lag()    masks stats::lag()
 
@@ -1711,7 +1715,7 @@ rm(raindata_NA)
     ## Warning in rm(raindata_NA): object 'raindata_NA' not found
 
 ``` r
-write_csv(raindata, "rainfall.csv")
+write_csv(raindata, "portlandrainfall.csv")
 ```
 
 # Load CSO Event Files
@@ -1733,8 +1737,9 @@ print(fns)
     ## [1] "2015_Portland_CSO_Overflow_Estimates.xls"           
     ## [2] "2016_Portland_Flows_-_Final.xlsx"                   
     ## [3] "2019 Portland CSO Activity and Volumes - Final.xlsx"
-    ## [4] "Portland_CSO_Activity_-_2017.xlsx"                  
-    ## [5] "Portland_CSO_Activity_-_2018.xlsx"
+    ## [4] "DATA_SOURCES.md"                                    
+    ## [5] "Portland_CSO_Activity_-_2017.xlsx"                  
+    ## [6] "Portland_CSO_Activity_-_2018.xlsx"
 
 ### Code to Extract Year From Each Filename
 
@@ -1748,7 +1753,9 @@ from the variable filename. (The group is defined by the parentheses.)
 (years <- as.integer(sub('.*([0-9]{4}).*','\\1',fns)))
 ```
 
-    ## [1] 2015 2016 2019 2017 2018
+    ## Warning: NAs introduced by coercion
+
+    ## [1] 2015 2016 2019   NA 2017 2018
 
 ## Read in 2015 Data
 
@@ -1774,7 +1781,8 @@ CSO_locs_15 <- read_excel(fpath, range = 'E3:AI6', col_names = FALSE)[-3,] %>%
   as.tibble() %>%
   select(-1) %>%
   rename(CSO = V3, Location = V2 ) %>%
-  select(CSO, Location)
+  select(CSO, Location) %>%
+  mutate(CSO = sub(' ', '_', CSO))
 ```
 
     ## New names:
@@ -1795,6 +1803,30 @@ CSO_locs_15 <- read_excel(fpath, range = 'E3:AI6', col_names = FALSE)[-3,] %>%
     ## Using compatibility `.name_repair`.
     ## This warning is displayed once every 8 hours.
     ## Call `lifecycle::last_warnings()` to see where this warning was generated.
+
+``` r
+CSO_locs_15
+```
+
+    ## # A tibble: 31 x 2
+    ##    CSO     Location      
+    ##    <chr>   <chr>         
+    ##  1 CSO_002 Arcadia St PS 
+    ##  2 CSO_004 Tukey's Siphon
+    ##  3 CSO_005 Randall St    
+    ##  4 CSO_006 Johansen St   
+    ##  5 CSO_007 Ocean Ave     
+    ##  6 CSO_008 Clifton St    
+    ##  7 CSO_009 George St     
+    ##  8 CSO_010 Mackworth St  
+    ##  9 CSO_011 Codman St     
+    ## 10 CSO_012 Vannah Ave    
+    ## # ... with 21 more rows
+
+``` r
+CSO_locs_15 %>%
+  write_csv('Portland_Locations.csv')
+```
 
 ### Read 2015 Data
 
@@ -2558,17 +2590,28 @@ CSO_data_2015 <- read_excel(fpath,  skip = 5,
 
 Again, the warnings are expected, and not a problem.
 
+### Error Correction
+
+One date was improperly entered as from 2014. We correct that here.
+
+``` r
+CSO_data_2015$thedate[CSO_data_2015$thedate == as.Date('2014-07-20')] <- as.Date('2015-07-20')
+```
+
 ### Reprocess to Match Other File Format
 
 We use `pivot_longer()` -\> `Group_by()` -\> `summarize()`, followed by
 `pivot_wider()` to simplify application of similar aggregation functions
 to all the CSO locations.
 
+#### Step 1
+
+First, use group\_by( ) with mutate() to calculate first and last dates
+and max hourly precip for each event. These columns are moved to the
+front to simplify the pivots, later.
+
 ``` r
 CSO_data_2015 <- CSO_data_2015 %>%
-  # First, use group_by( ) with mutate() to calculate first and last dates
-  # and max hourly precip for each event these columns are moved to the
-  # front to simplify the pivots, later.
   group_by(event) %>%
   mutate(firstdate = min(thedate),
          lastdate = max(thedate),
@@ -2577,26 +2620,54 @@ CSO_data_2015 <- CSO_data_2015 %>%
   ungroup() %>%
   select(event, firstdate, lastdate,    # reorder columns
          totalprecip, maxprecip,
-         everything())%>%
-  
-  #Now pivot to long form, and summarize to generate event totals
+         everything())
+```
+
+#### Step 2
+
+Now pivot to long form.
+
+``` r
+CSO_data_2015 <- CSO_data_2015 %>%
   pivot_longer(cols = CSO_002:eventtotal,
                names_to = 'SourceCol',
-               values_to = 'Vol') %>%
+               values_to = 'Vol')
+```
+
+#### Step 3
+
+Use summarize to generate event totals. (note that leaving out the
+“na.rm = TRUE” in the second to last line here led to a mysterious
+mismatch between our values and the totals calculated in the source
+Excel files. The reason we broke this calculation up into many pieces
+was to help isolate where the error was hiding.
+
+``` r
+CSO_data_2015 <- CSO_data_2015 %>%
   group_by(event, SourceCol) %>%
   summarize(firstdate = first(firstdate),
             lastdate = last(lastdate),
             days = as.integer(lastdate - firstdate) + 1,
             totalprecip = first(totalprecip),
             maxprecip = first(maxprecip),
-            total = sum(Vol),
-            .groups = 'drop') %>%
-  
-  # and finally, pivot back to the other form.
+            total = sum(Vol, na.rm = TRUE),
+            .groups = 'drop')
+```
+
+#### Step 4
+
+Finally, pivot back to the wide form.
+
+``` r
+CSO_data_2015 <- CSO_data_2015 %>%
   pivot_wider(names_from = SourceCol, values_from = total)
 ```
 
-### Which CSOs Were Monitoried All Year in 2015?
+### Which CSOs Were Monitored All Year in 2015?
+
+Unmeasured events and CSOs are depicted in 2015 with ‘–’. We want to
+look at those events and see how much of a problem they may be for our
+presentation.
 
 ``` r
 CSO_data_missing <- read_excel(fpath,  skip = 5,
@@ -2719,6 +2790,16 @@ CSO_data_2016 <- read_excel(fpath, skip = 5,
 "Portland\_CSO\_Activity\_-*2017.xlsx"  
 \[5\] "Portland\_CSO\_Activity*-\_2018.xlsx"
 
+#### Error Correction
+
+One event was improperly entered as being from 2017. We correct that
+here.
+
+``` r
+CSO_data_2016$firstdate[CSO_data_2016$lastdate == as.Date('2017-02-04')] <- as.Date('2016-02-03')
+CSO_data_2016$lastdate[CSO_data_2016$lastdate  == as.Date('2017-02-04')] <- as.Date('2016-02-04')
+```
+
 ### 2017 Data
 
 CSO 43 has been dropped, probably as inactive.
@@ -2796,6 +2877,16 @@ CSO_data_2017$lastdate[2] <- as.Date('2017-01-11', format = '%Y-%m-%d')
 CSO_data_2017 <- CSO_data_2017 %>%
   mutate(days = as.integer(lastdate - firstdate) + 1) %>%
   select(event, firstdate, lastdate, days, totalprecip, maxprecip, everything())
+```
+
+#### Error Correction
+
+One date was improperly entered as being from 2007. We correct that
+here.
+
+``` r
+CSO_data_2017$days[CSO_data_2017$lastdate == as.Date('2007-04-22')] <- 1
+CSO_data_2017$lastdate[CSO_data_2017$lastdate == as.Date('2007-04-22')] <- as.Date('2017-04-22')
 ```
 
 ### 2018 Data
@@ -3030,6 +3121,63 @@ CSO_data_2019 <- read_excel(fpath, skip = 10,
     ## * DATE -> DATE...2
     ## * DATE -> DATE...3
 
+#### Error Correction
+
+One date was improperly entered as being from 3019. We correct that
+here.
+
+``` r
+CSO_data_2019$days[CSO_data_2019$lastdate == as.Date('3019-06-11')] <- 1
+CSO_data_2019$lastdate[CSO_data_2019$lastdate == as.Date('3019-06-11')] <- as.Date('2019-06-11')
+```
+
+#### Subtract values “Assumed Captured by Tank”
+
+A number of values shown in the 2019 Excel data are confusing. All
+numbers associated with CSO 006, and CSO 007 are in RED. SOme discharge
+numbers are listed in the Excel sheet, but also shown in “strike
+through”. The “strike through” values were subtracted from column
+(CSO) totals, but not from row (event) totals in the source Excel File.
+
+The failure to subtract these values them from the row totals may have
+been a partial oversight by PWD Staff. Annual Total discharges were
+calculated as the sum of the (corrected) column totals. It is not clear
+if the row (event) totals were reviewed.
+
+A Note at the bottom of the spreadsheet says: \> Note 3: Data in red
+indicates volume after storage tank. Struckthrough results were assumed
+totally captured by tank. See notes for individual capture volumes.
+
+##### Relevant Events
+
+| **Event** | **CSO\_006** | **CSO\_007** |
+| --------- | ------------ | ------------ |
+| 3         | ~~78000~~    | 2585000      |
+| 12        | ~~32600~~    | 1567000      |
+| 26        | ~~3200~~     |              |
+| 27        | ~~200~~      |              |
+| 32        | ~~2000~~     | ~~515000~~   |
+| 46        | 38800        | 1247000      |
+
+We remove all the “strike through” values here, before any calculations.
+
+``` r
+CSO_data_2019[CSO_data_2019$event ==  3,]$CSO_006 <- 0
+CSO_data_2019[CSO_data_2019$event == 12,]$CSO_006 <- 0
+CSO_data_2019[CSO_data_2019$event == 26,]$CSO_006 <- 0
+CSO_data_2019[CSO_data_2019$event == 27,]$CSO_006 <- 0
+CSO_data_2019[CSO_data_2019$event == 32,]$CSO_006 <- 0
+
+CSO_data_2019[CSO_data_2019$event == 32,]$CSO_007 <- 0
+```
+
+#### Remove early 2020 Events
+
+``` r
+CSO_data_2019 <- CSO_data_2019 %>%
+  filter(lastdate < as.Date("2020-01-01"))
+```
+
 # Save Five Years of Portland CSO Event Data
 
 ## Combine Data
@@ -3042,10 +3190,39 @@ CSO_data_15_19 <- CSO_data_2015 %>%
   bind_rows(CSO_data_2016) %>%
   bind_rows(CSO_data_2017) %>%
   bind_rows(CSO_data_2018) %>%
-  bind_rows(CSO_data_2019)
+  bind_rows(CSO_data_2019) %>%
+  mutate(Year = as.integer(format(firstdate, format = '%Y')))
 rm(CSO_data_2015, CSO_data_2016, CSO_data_2017, CSO_data_2018, CSO_data_2019)
 ```
 
 ``` r
 write_csv(CSO_data_15_19, 'Portland_CSO_data_2015_2019.csv')
+```
+
+# Export Data for GIS
+
+## Calculate Totals by CSO
+
+``` r
+data_by_cso <- CSO_data_15_19 %>%
+  summarize(across(contains('CSO'),
+                   c(Events = ~ sum(! is.na(.x) & .x>0),
+                   Volume = ~ sum(.x, na.rm = TRUE),
+                   Events2019 = ~ sum((! is.na(.x) & .x>0) *(Year == 2019), na.rm = TRUE),
+                   Volume2019 = ~ sum(.x *(Year == 2019), na.rm = TRUE)),
+                   .names = paste0('{.col}_{.fn}'))) %>%
+  t %>%         # t transposes, but also converts to an array, with dimnames
+  tibble(Item = dimnames(.)[[1]]) %>%
+  rename(Val = 1) %>%
+  mutate(group = sub('^.*_', '', Item),
+         CSO   = substr(Item, 1,7)) %>%
+  pivot_wider(id_cols = CSO, names_from = group, values_from = Val) %>%
+  inner_join(CSO_locs_15, by = 'CSO') %>%
+  select(CSO, Location, everything())
+```
+
+## Export File
+
+``` r
+write_csv(data_by_cso, 'portland_cso_summary.csv')
 ```

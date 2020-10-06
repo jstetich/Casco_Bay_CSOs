@@ -107,7 +107,7 @@ rm(raindata_2015, raindata_2016, raindata_2017, raindata_2018, raindata_2019)
 rm(raindata_NA)
 ```
 ```{r}
-write_csv(raindata, "rainfall.csv")
+write_csv(raindata, "portlandrainfall.csv")
 ```
 
 
@@ -155,7 +155,13 @@ CSO_locs_15 <- read_excel(fpath, range = 'E3:AI6', col_names = FALSE)[-3,] %>%
   as.tibble() %>%
   select(-1) %>%
   rename(CSO = V3, Location = V2 ) %>%
-  select(CSO, Location)
+  select(CSO, Location) %>%
+  mutate(CSO = sub(' ', '_', CSO))
+CSO_locs_15
+```
+```{r write_location}
+CSO_locs_15 %>%
+  write_csv('Portland_Locations.csv')
 ```
 
 ### Read 2015 Data
@@ -176,17 +182,23 @@ CSO_data_2015 <- read_excel(fpath,  skip = 5,
 ```
 Again, the warnings are expected, and not a problem.
 
+### Error Correction
+One date was improperly entered as from 2014.  We correct that here.
+```{r correct_2015}
+CSO_data_2015$thedate[CSO_data_2015$thedate == as.Date('2014-07-20')] <- as.Date('2015-07-20')
+```
+
 ### Reprocess to Match Other File Format
-We use `pivot_longer()` -> `Group_by()` -> `summarize()`,
-followed by `pivot_wider()` to simplify application of similar
-aggregation functions to all the CSO locations.
+We use `pivot_longer()` -> `Group_by()` -> `summarize()`, followed by
+`pivot_wider()` to simplify application of similar aggregation functions to all
+the CSO locations.
 
-
-```{r}
+#### Step 1
+First, use group_by( ) with mutate() to calculate first and last dates and max
+hourly precip for each event.  These columns are moved to the front to simplify
+the pivots, later.
+```{r step_1}
 CSO_data_2015 <- CSO_data_2015 %>%
-  # First, use group_by( ) with mutate() to calculate first and last dates
-  # and max hourly precip for each event these columns are moved to the
-  # front to simplify the pivots, later.
   group_by(event) %>%
   mutate(firstdate = min(thedate),
          lastdate = max(thedate),
@@ -195,28 +207,48 @@ CSO_data_2015 <- CSO_data_2015 %>%
   ungroup() %>%
   select(event, firstdate, lastdate,    # reorder columns
          totalprecip, maxprecip,
-         everything())%>%
-  
-  #Now pivot to long form, and summarize to generate event totals
+         everything())
+```
+
+#### Step 2
+Now pivot to long form.
+```{r step_2}
+CSO_data_2015 <- CSO_data_2015 %>%
   pivot_longer(cols = CSO_002:eventtotal,
                names_to = 'SourceCol',
-               values_to = 'Vol') %>%
+               values_to = 'Vol')
+```
+
+#### Step 3
+Use summarize to generate event totals.  (note that leaving out the "na.rm =
+TRUE" in the second to last line here led to a mysterious mismatch between our
+values and the totals calculated in the source Excel files. The reason we broke
+this calculation up into many pieces was to help isolate where the error was
+hiding.
+```{r step_3}
+CSO_data_2015 <- CSO_data_2015 %>%
   group_by(event, SourceCol) %>%
   summarize(firstdate = first(firstdate),
             lastdate = last(lastdate),
             days = as.integer(lastdate - firstdate) + 1,
             totalprecip = first(totalprecip),
             maxprecip = first(maxprecip),
-            total = sum(Vol),
-            .groups = 'drop') %>%
-  
-  # and finally, pivot back to the other form.
+            total = sum(Vol, na.rm = TRUE),
+            .groups = 'drop')
+```
+
+#### Step 4
+Finally, pivot back to the wide form.
+```{r step_4}
+CSO_data_2015 <- CSO_data_2015 %>%
   pivot_wider(names_from = SourceCol, values_from = total)
 ```
 
 
-### Which CSOs Were Monitoried All Year in 2015?
-```{r}
+### Which CSOs Were Monitored All Year in 2015?
+Unmeasured events and CSOs are depicted in 2015 with '--'.  We want to look at
+those events and see how much of a problem they may be for our presentation.
+```{r unmonitored_sites}
 CSO_data_missing <- read_excel(fpath,  skip = 5,
                             col_types = c('numeric', 'date', 
                                           'skip', 'skip',         # precip
@@ -258,16 +290,13 @@ CSO_data_missing <- read_excel(fpath,  skip = 5,
    knitr::kable(col.names = c('CSO', 'Events', 'Unmeasured', 'Percent'))
 ```  
   
-
-
-
 ## Read the Other Files
 Unfortunately, the other files are not laid out quite consistently, so
 while it is possible to read these files in programatically, it is quicker
 (if less elegant) to just read each in separately.
 
 ### 2016 Data
-```{r}
+```{r 2016_data}
 fn <- "2016_Portland_Flows_-_Final.xlsx"
 fpath = file.path(niece, fn)
 
@@ -293,12 +322,19 @@ CSO_data_2016 <- read_excel(fpath, skip = 5,
 [5] "Portland_CSO_Activity_-_2018.xlsx"     
 
 
+#### Error Correction
+One event was improperly entered as being from 2017.  We correct that here.
+```{r 2016_corrections}
+CSO_data_2016$firstdate[CSO_data_2016$lastdate == as.Date('2017-02-04')] <- as.Date('2016-02-03')
+CSO_data_2016$lastdate[CSO_data_2016$lastdate  == as.Date('2017-02-04')] <- as.Date('2016-02-04')
+```
+
 ### 2017 Data
 CSO 43 has been dropped, probably as inactive.
 
 There are a number of typographical errors in the date columns, especially 
 in the year designation in the lastdate value.
-```{r}
+```{r 2017_data}
 fn <- "Portland_CSO_Activity_-_2017.xlsx"
 fpath = file.path(niece, fn)
 
@@ -336,11 +372,18 @@ CSO_data_2017 <- CSO_data_2017 %>%
   select(event, firstdate, lastdate, days, totalprecip, maxprecip, everything())
 
 ```
+#### Error Correction
+One date was improperly entered as being from 2007.  We correct that here.
+```{r 2017_corrections}
+CSO_data_2017$days[CSO_data_2017$lastdate == as.Date('2007-04-22')] <- 1
+CSO_data_2017$lastdate[CSO_data_2017$lastdate == as.Date('2007-04-22')] <- as.Date('2017-04-22')
+```
+
 
 ### 2018 Data
 There is again one typographical error on the dates, where the year was
 transcribed incorrectly.
-```{r}
+```{r 2018_data}
 fn <- "Portland_CSO_Activity_-_2018.xlsx"
 fpath = file.path(niece, fn)
 
@@ -368,7 +411,7 @@ CSO_data_2018$days[25] <- 2
 ### 2019 Data
 There is again one typogrphical error on the dates, where the year was
 transcribed incorrectly.
-```{r}
+```{r 2019_data}
 fn <- "2019 Portland CSO Activity and Volumes - Final.xlsx"
 fpath = file.path(niece, fn)
 
@@ -389,22 +432,100 @@ CSO_data_2019 <- read_excel(fpath, skip = 10,
   select(event, firstdate, lastdate, days, totalprecip, maxprecip, everything())
 ```
 
+#### Error Correction
+One date was improperly entered as being from 3019.  We correct that here.
+```{r 2019_corrections}
+CSO_data_2019$days[CSO_data_2019$lastdate == as.Date('3019-06-11')] <- 1
+CSO_data_2019$lastdate[CSO_data_2019$lastdate == as.Date('3019-06-11')] <- as.Date('2019-06-11')
+```
+
+#### Subtract values "Assumed Captured by Tank"
+
+A number of values shown in the 2019 Excel data are confusing.  All numbers
+associated with CSO 006, and CSO 007 are in RED.  SOme discharge numbers are
+listed in the Excel sheet, but also shown in "strike through". The "strike
+through" values were subtracted from column (CSO) totals, but not from row
+(event) totals in the source Excel File.
+
+The failure to subtract these values them from
+the row totals may have been a partial oversight by PWD Staff.  Annual Total
+discharges were calculated as the sum of the (corrected) column totals. It is 
+not clear if the row (event) totals were reviewed.
+
+A Note at the bottom of the spreadsheet says:
+> Note 3:  Data in red indicates volume after storage tank. Struckthrough
+  results were assumed totally captured by tank. See notes for individual
+  capture volumes.
+
+##### Relevant Events
+**Event** |  **CSO_006**    |  **CSO_007** 
+----------|-----------------|---------
+    3     |  ~~78000~~      |  2585000   
+    12    |  ~~32600~~      |  1567000  
+    26    |   ~~3200~~      |
+    27    |    ~~200~~      |
+    32    |   ~~2000~~      | ~~515000~~  
+    46    |    38800        |  1247000  
+
+
+We remove all the "strike through" values here, before any calculations.
+```{r}
+CSO_data_2019[CSO_data_2019$event ==  3,]$CSO_006 <- 0
+CSO_data_2019[CSO_data_2019$event == 12,]$CSO_006 <- 0
+CSO_data_2019[CSO_data_2019$event == 26,]$CSO_006 <- 0
+CSO_data_2019[CSO_data_2019$event == 27,]$CSO_006 <- 0
+CSO_data_2019[CSO_data_2019$event == 32,]$CSO_006 <- 0
+
+CSO_data_2019[CSO_data_2019$event == 32,]$CSO_007 <- 0
+```
+
+#### Remove early 2020 Events
+```{r remove_2020_event}
+CSO_data_2019 <- CSO_data_2019 %>%
+  filter(lastdate < as.Date("2020-01-01"))
+```
+
 # Save Five Years of Portland CSO Event Data
 ## Combine Data
 There aught to be a way to automate this step so I don't have to write out each 
 name.
-```{r}
+```{r combine_data}
 CSO_data_15_19 <- CSO_data_2015 %>%
   bind_rows(CSO_data_2016) %>%
   bind_rows(CSO_data_2017) %>%
   bind_rows(CSO_data_2018) %>%
-  bind_rows(CSO_data_2019)
+  bind_rows(CSO_data_2019) %>%
+  mutate(Year = as.integer(format(firstdate, format = '%Y')))
 rm(CSO_data_2015, CSO_data_2016, CSO_data_2017, CSO_data_2018, CSO_data_2019)
 ```
 
-```{r}
+```{r save_results}
 write_csv(CSO_data_15_19, 'Portland_CSO_data_2015_2019.csv')
 ```
 
+# Export Data for GIS
+## Calculate Totals by CSO
+```{r five_year_totals}
+data_by_cso <- CSO_data_15_19 %>%
+  summarize(across(contains('CSO'),
+                   c(Events = ~ sum(! is.na(.x) & .x>0),
+                   Volume = ~ sum(.x, na.rm = TRUE),
+                   Events2019 = ~ sum((! is.na(.x) & .x>0) *(Year == 2019), na.rm = TRUE),
+                   Volume2019 = ~ sum(.x *(Year == 2019), na.rm = TRUE)),
+                   .names = paste0('{.col}_{.fn}'))) %>%
+  t %>%         # t transposes, but also converts to an array, with dimnames
+  tibble(Item = dimnames(.)[[1]]) %>%
+  rename(Val = 1) %>%
+  mutate(group = sub('^.*_', '', Item),
+         CSO   = substr(Item, 1,7)) %>%
+  pivot_wider(id_cols = CSO, names_from = group, values_from = Val) %>%
+  inner_join(CSO_locs_15, by = 'CSO') %>%
+  select(CSO, Location, everything())
+```
 
+
+## Export File
+```{r}
+write_csv(data_by_cso, 'portland_cso_summary.csv')
+```
 
