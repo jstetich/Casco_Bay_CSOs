@@ -35,12 +35,12 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
 
 ``` r
 library(tidyverse)
-#> -- Attaching packages --------------------------------------------------------------------- tidyverse 1.3.0 --
+#> -- Attaching packages -------------------------------------------- tidyverse 1.3.0 --
 #> v ggplot2 3.3.2     v purrr   0.3.4
 #> v tibble  3.0.3     v dplyr   1.0.2
 #> v tidyr   1.1.2     v stringr 1.4.0
 #> v readr   1.3.1     v forcats 0.5.0
-#> -- Conflicts ------------------------------------------------------------------------ tidyverse_conflicts() --
+#> -- Conflicts ----------------------------------------------- tidyverse_conflicts() --
 #> x dplyr::filter() masks stats::filter()
 #> x dplyr::lag()    masks stats::lag()
 
@@ -344,10 +344,30 @@ plt +
 #> Warning: Removed 17 rows containing missing values (position_stack).
 ```
 
-![](DEP_CSO_Graphics_files/figure-gfm/add_annotations-1.png)<!-- -->
+![](DEP_CSO_Graphics_files/figure-gfm/Towns_add_annotations-1.png)<!-- -->
 
 ``` r
 #ggsave('figures/CSO_town_area.pdf', device = cairo_pdf, width = 7, height = 5)
+```
+
+``` r
+plt <- cb_towns_data_long %>%
+  ggplot(aes(x = Year, y = Volume)) + 
+  geom_line(aes(color = Community)) +
+  ylab('CSO Volume\n Gallons\n(log scale)') +
+  scale_color_manual(values = cbep_colors2(), name = '') +
+  theme(legend.position=c(.75,.25)) +
+  scale_y_log10(labels = scales::trans_format("log10",
+                                              scales::math_format(10^.x)))
+plt
+#> Warning: Transformation introduced infinite values in continuous y-axis
+#> Warning: Removed 17 row(s) containing missing values (geom_path).
+```
+
+![](DEP_CSO_Graphics_files/figure-gfm/towns_try_log-1.png)<!-- -->
+
+``` r
+#ggsave('figures/CSO_town_lines.pdf', device = cairo_pdf, width = 7, height = 5)
 ```
 
 ## Total Discharges
@@ -487,8 +507,8 @@ plt
 ![](DEP_CSO_Graphics_files/figure-gfm/total_outfalls_line-1.png)<!-- -->
 
 ``` r
-ggsave('figures/CSO_outfalls_points.pdf', device = cairo_pdf, width = 7, height = 5)
-#> `geom_smooth()` using formula 'y ~ x'
+#ggsave('figures/CSO_outfalls_points.pdf',
+#       device = cairo_pdf, width = 7, height = 5)
 ```
 
 ## Total Events (NOT)
@@ -532,3 +552,7 @@ cb_towns_data_long %>%
 | South Portland |      3 |        4 |     8.65 |
 | Westbrook      |      4 |        5 |     9.82 |
 | Total          |     55 |       40 |   203.35 |
+
+Town by Town Changes
+
+Cac

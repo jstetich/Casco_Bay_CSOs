@@ -1,0 +1,271 @@
+---
+title: "Casco Bay CSO Exploratory Analysis and Graphics"
+author: Curtis C. Bohlen, Casco Bay Estuary Partnership
+output:
+  github_document:
+    toc: true
+    fig_width: 7
+    fig_height: 5
+---
+
+<img
+    src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
+    style="position:absolute;top:10px;right:50px;" />
+
+```{r, echo = FALSE}
+  knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+
+#Load Libraries
+```{r load_libraries}
+library(tidyverse)
+
+library(CBEPgraphics)
+load_cbep_fonts()
+theme_set(theme_cbep())
+
+library(corrplot)
+
+library(mblm)  # Includes a Theil-Sen estimator.
+               # See also archive on atmospheric deposition (?)
+               # or maybe it was bacteris in shellfish....)
+```
+
+# Load DEP Data
+## Establish Folder References
+```{r folder_references}
+sibfldnm <- 'Derived_Data'
+parent   <- dirname(getwd())
+sibling  <- file.path(parent,sibfldnm)
+
+dir.create(file.path(getwd(), 'figures'), showWarnings = FALSE)
+```
+
+
+```{r load_data}
+fn <-'DEP_Annual_Totals.csv'
+fpath <- file.path(sibling, fn)
+the_data <- read_csv(fpath, col_types = 
+                       c(Community = col_character(),
+                         Year = col_integer(),
+                         Volume = col_double(),
+                         Events = col_double(),
+                         Outfalls = col_double()))
+```
+
+# Load Weather Data
+## Establish Folder Reference
+```{r folder_references_2}
+sibfldnm <- 'Original_Data'
+parent   <- dirname(getwd())
+sibling  <- file.path(parent,sibfldnm)
+```
+
+## Access data
+We extract annual Precipitation Totals (in mm), and Annual Days with more than
+one tenth of an inch (2.5mm), and one inch (25.4mm) of rain from the annual
+weather summaries from NOAA.
+```{r rain_data}
+fn <-'Annual_Weather_PWD.csv'
+fpath <- file.path(sibling, fn)
+rain_data <- read_csv(fpath, col_types =
+                       cols(date = col_datetime(format = ""),
+                            datatype = col_character(),
+                            value = col_double(),
+                            attributes = col_character(),
+                            station = col_skip())) %>%
+  mutate(Year = as.integer(format(date, format = '%Y'))) %>%
+  filter (datatype %in% c('PRCP', 'DP10', 'DP1X')) %>%
+  select(Year, datatype, value) %>%
+  pivot_wider(names_from = datatype, values_from = value) %>%
+  rename(Precip_mm = PRCP, GT0.1 = DP10, GT1.0 = DP1X) %>%
+  mutate(Precip_in = Precip_mm / 25.4) %>%
+  filter(Year > 1996)
+```
+
+## Examine Correlations
+```{r precip_correlations}
+cor(rain_data, use = 'pairwise')
+```
+There are what are likely to be statistically significant correlations between
+year and number of large storm and total rainfall even over this short period.
+(See the Climate Change indicator for analysis of a longer time series.)
+
+The high correlation between number of large storms and total precipitation may
+complicate separating those two factors in any analysis -- but we don't really
+need to do that in this worksheet.
+
+# Refine Data
+## Identify Casco Bay CSO Communities by Name
+```{r casco_towns}
+cb_cso_towns <- c("Cape Elizabeth",
+                "Portland & PWD",
+                "South Portland",
+                "Westbrook",
+                "Yarmouth")            
+```
+
+## Casco Bay Towns Data
+Although the number of events and outfalls were reported in the 2008 CSO report
+for years prior to 2006, they show no variation, suggesting these data are not
+meaningful, so we strip them out here.
+```{r casco_towns_data}
+cb_towns_data_long <- the_data %>%
+  filter(Community %in% cb_cso_towns) %>%
+  mutate(VolumeMG = Volume / (10^6)) %>%
+  filter(Year > 1996)
+
+cb_towns_data_wide <- cb_towns_data_long %>%
+  pivot_wider(Year, names_from = Community,
+              values_from = c(Volume, Events, Outfalls),
+              names_repair = 'universal') %>%
+  rename_with(~ sub('\\.\\.\\.', '.', .x )) %>% # replace triple dots in Portland
+  rowwise() %>%
+  mutate(Total = sum(c(Volume_Cape.Elizabeth,
+                       Volume_Portland.PWD,
+                       Volume_South.Portland,
+                       Volume_Westbrook,
+                       Volume_Yarmouth), na.rm = TRUE),
+         PctPortland = Volume_Portland.PWD/Total) %>%
+  ungroup()
+```
+
+## Totals Data
+Including total discharge volumes each year, in Millions of Gallons.
+```{r annual_data}
+annual_data <- the_data %>%
+  group_by(Year) %>%
+  summarize(TotVol      = sum(Volume,   na.rm = TRUE),
+            TotVolMG    = TotVol / (10^6),
+            TotEvents   = sum(Events,   na.rm = TRUE),
+            TotOutfalls = sum(Outfalls, na.rm = TRUE),
+            
+            CBTotVol      = sum(Volume*(Community %in% cb_cso_towns),
+                                na.rm = TRUE),
+            CBVolMG    = CBTotVol / (10^6),
+            CBTotEvents   = sum(Events*(Community %in% cb_cso_towns),
+                                na.rm = TRUE),
+            CBTotOutfalls = sum(Outfalls*(Community %in% cb_cso_towns),
+                                na.rm = TRUE),
+            
+            CBPctVol       = round(CBTotVol / TotVol, 4) * 100,
+            CBPctEvents    = round(CBTotEvents / TotEvents, 4) * 100,
+            CBPctOutfalls  = round(CBTotOutfalls / TotOutfalls, 4) * 100,
+            .groups = 'drop') %>%
+  filter(Year > 1996)
+```
+
+# Merge Three Data Sets
+```{r assemble_data}
+annual_data_all <- rain_data %>%
+  left_join(cb_towns_data_wide, by = 'Year') %>%
+  select (-Total) %>%
+  rename(PctCascoPortland = PctPortland) %>%
+  left_join(annual_data, by = 'Year') %>%
+  mutate(CSO_MG_per_inch = CBVolMG / Precip_in)
+rm(annual_data, cb_towns_data_wide, rain_data, the_data)
+```
+
+# Correlations by Year
+```{r correlation_figure}
+cors <- cor(annual_data_all, use = 'pairwise')
+corrplot(cors, method="circle", type = 'upper', tl.cex = .5)
+rm(cors)
+```
+What jumps out is:
+
+1. Year is negatively correlated with volume and events
+2. Year is positively (though not strongly) correlated with precipitation. 
+3. Total CSO VOlumes and Events statewide are dropping even faster than in
+   our region, so the percentage of the states CSOs from her is climbing.
+4. Volume and number of CSO events are correlated across the region. Bad
+   years in one jurisdiction are bad for many.
+5. Portland's CSOs are a big enough part of regional and state-wide totals
+   so that they are always highly correlated with totals.
+The precipitation variables are not all that highly
+correlated with the other variables, but that 
+
+# Generate Models and Extract Coefficients
+We want to extract slopes for the reduction in CSO volumes for each of our communities, and express them as an annual average percent reduction in CSO volume over the last two decades. Since Yarmouth is no longer considered a CSO community, we exclude them from the analysis.
+
+Given the high variability of CSO discharge numbers, and the strongly non-normal structure of errors, it is unlikely that standard linear regressions would be suited to documenting the rate of reduction in CSO volumes.  Here wqe calculate
+both linear and Theil-Sen estimators of slope on 
+
+Here we use tidyr's list columns to automate identical statistical analyses for each town.
+
+We use a log transformed analysis, rather than a linear analysis, as it better addresses the structure of the data, and allows us to readily reinterpret teh model coefficients in terms of an annual long-term average decline in volumes.
+
+Statistical significance of a (bivariate) Theil-Sen slope estimate is identical to the test for significance of the closely-related Kendall's Tau correlation coefficient. We use `cor.test()` to test for significance.  We do not extract the p value of the linear models, as we would not believe them anyway, but we do look at the related t statistic, to help get a sense of the strength of the evidence supporting a linear trend.  Teh two methoids give similar assessmsnts of which slopes are robust, although slopeestimates differ somewhat.
+
+We report the Theil-Sen slopes.
+```{r log_analyses}
+res <- cb_towns_data_long %>%
+  filter(Community != 'Yarmouth') %>%
+  mutate(logVolume = log(Volume+100)) %>%
+  group_by(Community) %>%
+  nest() %>%
+  mutate(mylm = map(data, function(df) lm(logVolume ~ Year, data = df)),
+         lmslope = unlist(map(mylm, function(m) coef(m)[2])),
+         lmsd = unlist(map(mylm,
+                             function(m) coef(summary(m))[, 2][[2]])),
+         tlm = lmslope/lmsd,
+         myts = map(data, function(df) mblm(logVolume ~ Year, data = df)),
+         tsslope = unlist(map(myts, function(m) coef(m)[2])),
+         tsCortest = (map(data, function(df)
+                     cor.test(df$Year, df$logVolume, method = 'kendall'))),
+         tscor = unlist(map(tsCortest, function(x) x$estimate)),
+         tsp = unlist(map(tsCortest, function(x) x$p.value))) %>%
+  select(-tsCortest)
+res
+```
+
+## Calculate Annual Percent Changes
+The relationship between log-transformed variables and percent change is simply
+the following:
+
+$$\frac{y(t+1)-y(t))}{y(t)}=e^m-1$$
+So, we can summarize the model results as follows:
+
+```{r annual_pct_change}
+res %>%
+  select(Community, lmslope, tsslope) %>%
+  mutate(across(c(lmslope, tsslope), ~ (exp(.)-1) * 100)) %>%
+  rename(Ann_Pct_Chng_lm = lmslope,
+         Ann_Pct_Chng_ts = tsslope)
+```
+Here, we prefer the Theil-Sen slopes, as they are robust to outliers.  
+
+## The Overall 23-Year Slope
+```{r overall_log_analyses}
+tmp  <- cb_towns_data_long %>%
+  select(Year, Volume) %>%
+  group_by(Year) %>%
+  mutate(Total = sum(Volume, na.rm = TRUE)) %>%
+  mutate(logVolume = log(Total + 100))        # + 100 for consistency
+                                              # but not really needed here
+  
+overalllm <-  lm(logVolume ~ Year, data = tmp)
+lmslope   <-  coef(overalllm)[2]
+lmsd      <-  coef(summary(overalllm))[, 2][[2]]
+tlm       <-  lmslope/lmsd
+
+
+overallts <- mblm(logVolume ~ Year, data = tmp)
+tsslope   <- coef(overallts)[2]
+
+tsCortest <- cor.test(tmp$Year, tmp$logVolume, method = 'kendall')
+tscor     <-  tsCortest$estimate
+tsp       <-  tsCortest$p.value
+
+cat('Linear Model Slope = ', lmslope, '\n')
+cat('t Statistic = ', tlm, '\n')
+cat('Related estimate of Annual Percent Change =',
+    (exp(lmslope)-1) * 100, '\n')
+cat('Theil-Sen Slope = ', tsslope, '\n')
+cat('Related p value = ', tsp)
+cat('Related estimate of Annual Percent Change =',
+    (exp(tsslope)-1) * 100, '\n')
+```
+
+

@@ -240,7 +240,7 @@ plt <- cb_towns_data_long %>%
 plt
 ```
 
-```{r add_annotations}
+```{r Towns_add_annotations}
 plt +
   geom_line(mapping = aes(y = Precip_in * 25), 
             data = annual_data_all,
@@ -263,6 +263,22 @@ plt +
         legend.text = element_text(size = 8))
 #ggsave('figures/CSO_town_area.pdf', device = cairo_pdf, width = 7, height = 5)
 ```
+
+
+```{r towns_try_log}
+plt <- cb_towns_data_long %>%
+  ggplot(aes(x = Year, y = Volume)) + 
+  geom_line(aes(color = Community)) +
+  ylab('CSO Volume\n Gallons\n(log scale)') +
+  scale_color_manual(values = cbep_colors2(), name = '') +
+  theme(legend.position=c(.75,.25)) +
+  scale_y_log10(labels = scales::trans_format("log10",
+                                              scales::math_format(10^.x)))
+plt
+#ggsave('figures/CSO_town_lines.pdf', device = cairo_pdf, width = 7, height = 5)
+```
+
+
 
 ## Total Discharges
 ```{r total_graphics_line}
@@ -372,7 +388,8 @@ plt <-annual_data_all %>%
   xlim(c(2000, 2020)) +
   ylim(c(20,50))
 plt
-ggsave('figures/CSO_outfalls_points.pdf', device = cairo_pdf, width = 7, height = 5)
+#ggsave('figures/CSO_outfalls_points.pdf',
+#       device = cairo_pdf, width = 7, height = 5)
 ```
 
 
@@ -395,3 +412,6 @@ cb_towns_data_long %>%
   
 ```
 
+Town by Town Changes 
+
+Cac
