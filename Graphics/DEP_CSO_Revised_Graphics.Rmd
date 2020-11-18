@@ -183,6 +183,50 @@ plt +
 ggsave('figures/CSO_town_area_REVISED.pdf',
        device = cairo_pdf, width = 7, height = 5)
 ```
+## Alternate Version, with Cape Elizabeth in Red
+```{r town_graphics_1}
+plt <- cb_towns_data_long %>%
+  ggplot(aes(x = Year, y = Volume)) + 
+  geom_area(aes(fill = Community)) +
+  ylab('CSO Volume\n(millions of gallons)') +
+  scale_fill_manual(values = c('red4', cbep_colors()[c(5,4,1)]), name = '') +
+  theme(legend.position=c(.75,.75))
+plt
+```
+
+```{r Towns_add_annotations}
+plt +
+  geom_line(mapping = aes(y = Precip_in * 25), 
+            data = data_combined,
+            color = cbep_colors()[3],
+            lwd = 0.5) +
+  geom_smooth(mapping = aes(y=Total),
+              data = data_combined,          
+              method = 'lm', se=FALSE,
+              color = cbep_colors()[3],
+              lwd = 0.5,
+              lty = 2) + 
+  geom_text(aes(x=2013, y=600, label = theannot),
+            family = 'Montserrat',
+            fontface = 'plain',
+            size = 4,
+            hjust = 0) +
+  geom_text(aes(x=2017, y=1400, label = 'Rainfall'),
+            family = 'Montserrat',
+            fontface = 'plain',
+            size = 3,
+            hjust = 0) +
+  scale_y_continuous(labels = scales::number,sec.axis = sec_axis(~ . / 25,
+                                         name = "Annual Rainfall (in)")) +
+  theme(legend.position = 'bottom',
+        legend.text = element_text(size = 8))
+ggsave('figures/CSO_town_area_REVISED_red.pdf',
+       device = cairo_pdf, width = 7, height = 5)
+```
+
+
+
+
 
 # Percent Reduction, Two Ways
 ## Simple Year Over Year Change
