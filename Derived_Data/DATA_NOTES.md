@@ -15,7 +15,7 @@ a row for each EVENT, with a start date and an end date.
 We use R code to transform the data into the same format as presented from later
 years.
 
-## Unmeasured Discharges From From2015
+## Unmeasured Discharges From 2015
 In addition, missing data has different import in 2015.  In 2015, "--",
 which is interpreted as missing by our code, is flagged in the source file
 as meaning "metering data unavailable."  It is quite abundant at some CSO sites.  
@@ -26,7 +26,7 @@ detected, so they function as an implicit zero.
 There may be no easy way to make these data fully consistent.  However, to
 prevent severe misinterpretation of the 2015 data, we looked at each
 CSO to determine how often it was marked with either the "--" code or the
-"BLOCK" code.  A total of eleven CSOs were not monitoried during at least on
+"BLOCK" code.  A total of eleven CSOs were not monitored during at least one
 CSO event.
 
 Three CSOs were always marked as not monitored:
@@ -132,11 +132,11 @@ Portland data we received from PWD.
 5.  We added a new (calculated) attribute with the form "CSO_###", which matches
     the nomenclature used in the Portland-specific CSO discharge data from 
     2015 through 2019.  
-6.  we imported the file "portland_Cso_summary.csv", which was produced in R, to
-    ArcGIS, and "Joined"" it to the "Portland_CSOs" layer.
+6.  We imported the file "portland_cso_summary.csv", which was produced in R, to
+    ArcGIS, and "Joined" it to the "Portland_CSOs" layer.
 7.  We then created new attributes and transferred the data to the
     "Portland_CSOs" shapefile, thus adding data on CSO frequency and magnitude
     to the shapefile.  The presence of location names offers a chance to double
-    check the text-based merge to make sure data was assigned to teh correct
+    check the text-based merge to make sure data was assigned to the correct
     CSO location.
 
