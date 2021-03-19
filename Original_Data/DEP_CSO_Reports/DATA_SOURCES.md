@@ -21,7 +21,7 @@ data from 1987 through 2019, but it omits 1989 through 2004 "for legibility."
 
 CBEP has retained a copy of DEP's 2008 report in our archives, which includes
 the older data.  However, much of the data collected before the mid 1990s was
-estimated, and not measured, so it is not especially helpful ion this context.
+estimated, and not measured, so it is not especially helpful in this context.
 
 ### Citations:
 > Maine Department of Environmental Protection. 2020.  Maine Combined Sewer

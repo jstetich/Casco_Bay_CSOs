@@ -2,28 +2,28 @@ Casco Bay CSO Exploratory Analysis and Graphics
 ================
 Curtis C. Bohlen, Casco Bay Estuary Partnership
 
-  - [Load DEP Data](#load-dep-data)
-      - [Establish Folder References](#establish-folder-references)
-  - [Load Weather Data](#load-weather-data)
-      - [Establish Folder Reference](#establish-folder-reference)
-      - [Access data](#access-data)
-      - [Examine Correlations](#examine-correlations)
-  - [Identify Casco Bay CSO Communities by
+-   [Load DEP Data](#load-dep-data)
+    -   [Establish Folder References](#establish-folder-references)
+-   [Load Weather Data](#load-weather-data)
+    -   [Establish Folder Reference](#establish-folder-reference)
+    -   [Access data](#access-data)
+    -   [Examine Correlations](#examine-correlations)
+-   [Identify Casco Bay CSO Communities by
     Name](#identify-casco-bay-cso-communities-by-name)
-  - [Casco Bay Towns Data](#casco-bay-towns-data)
-  - [Totals Data](#totals-data)
-  - [Merge Three Data Sets](#merge-three-data-sets)
-  - [Graphics](#graphics)
-      - [CSO Volumes Per Inch of Rain](#cso-volumes-per-inch-of-rain)
-          - [Linear Model to Extract
+-   [Casco Bay Towns Data](#casco-bay-towns-data)
+-   [Totals Data](#totals-data)
+-   [Merge Three Data Sets](#merge-three-data-sets)
+-   [Graphics](#graphics)
+    -   [CSO Volumes Per Inch of Rain](#cso-volumes-per-inch-of-rain)
+        -   [Linear Model to Extract
             Slope](#linear-model-to-extract-slope)
-      - [Regional CSO Volumes (by Town)](#regional-cso-volumes-by-town)
-          - [Linear Regression to Extract
+    -   [Regional CSO Volumes (by Town)](#regional-cso-volumes-by-town)
+        -   [Linear Regression to Extract
             Slope](#linear-regression-to-extract-slope)
-      - [Total Discharges](#total-discharges)
-      - [Total Outfalls](#total-outfalls)
-          - [Regression to Extract Slope](#regression-to-extract-slope)
-  - [Summary Table 2019](#summary-table-2019)
+    -   [Total Discharges](#total-discharges)
+    -   [Total Outfalls](#total-outfalls)
+        -   [Regression to Extract Slope](#regression-to-extract-slope)
+-   [Summary Table 2019](#summary-table-2019)
 
 <img
     src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
@@ -33,12 +33,12 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
 
 ``` r
 library(tidyverse)
-#> -- Attaching packages -------------------------------------------- tidyverse 1.3.0 --
-#> v ggplot2 3.3.2     v purrr   0.3.4
-#> v tibble  3.0.3     v dplyr   1.0.2
+#> -- Attaching packages --------------------------------------- tidyverse 1.3.0 --
+#> v ggplot2 3.3.3     v purrr   0.3.4
+#> v tibble  3.0.5     v dplyr   1.0.3
 #> v tidyr   1.1.2     v stringr 1.4.0
-#> v readr   1.3.1     v forcats 0.5.0
-#> -- Conflicts ----------------------------------------------- tidyverse_conflicts() --
+#> v readr   1.4.0     v forcats 0.5.0
+#> -- Conflicts ------------------------------------------ tidyverse_conflicts() --
 #> x dplyr::filter() masks stats::filter()
 #> x dplyr::lag()    masks stats::lag()
 
@@ -498,7 +498,7 @@ cb_towns_data_long %>%
 ```
 
 | Community      | Events | Outfalls | VolumeMG |
-| :------------- | -----: | -------: | -------: |
+|:---------------|-------:|---------:|---------:|
 | Cape Elizabeth |      2 |        1 |     0.43 |
 | Portland & PWD |     46 |       30 |   184.45 |
 | South Portland |      3 |        4 |     8.65 |
