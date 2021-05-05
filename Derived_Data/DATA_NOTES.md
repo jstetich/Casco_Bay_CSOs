@@ -3,7 +3,6 @@
     style="position:absolute;top:10px;right:50px;" />
 
 # Preparation of Portland CSO Data
-
 We use an R Notebook to prepare the Portland data for  analysis, working with
 data from 2015 through 2019.
 
@@ -100,7 +99,7 @@ fully delimited.
 
 
 # GIS Data
-## Spurce
+## Source
 The original geospatial data was downloaded on September 12, 2019 by
 Curtis C. Bohlen, from:
 https://geolibrary-maine.opendata.arcgis.com/datasets/mainedep-cso.
@@ -111,12 +110,16 @@ This file contains a statewide CSO data layer, derived from permit data.
 The file includes both "Active" and "Inactive" CSOs.
 
 ## We noted the following: 
-* Unlike data downloaded in previous years, the "STATUS" of all outfalls was
-  "ACTIVE"
+*  Unlike data downloaded in previous years, the "STATUS" of all outfalls
+   in the 2019 download was "ACTIVE".  (The data now available again contains 
+   both "Active" and "Inactive" CSOs.)
 *  "OUTFALL_ID" in this data set is NOT unique -- the ID numbers (here as
-strings, not numeric values) are apparently unique only within towns.
-*  "OUTFALL_NA" in Portland does not always precisely match the names in the
-Portland data we received from PWD.
+   strings, not numeric values) are apparently unique only within towns.  
+*  "OUTFALL_NA" in Portland does not always exactly match the names in the
+   Portland data we received from PWD.  The CSO numbers are consistent.
+*  South Portland now only has four active CSO (per the 2019 CSO report), 
+   but this data still includes six nominally "Active" CSOs. We correct that 
+   in data preparation.
 
 ## Processing
 1.  We used ArcGIS to select CSO locations in the Casco Bay region, and saved them
@@ -129,6 +132,14 @@ Portland data we received from PWD.
 4.  We added a new attribute, "Town", which removes extraneous details from each
     "FACILITY_N", combines PWD and Portland DPW outfalls (to "Portland"), and
     renames towns in standard capitalization.  
+5.  We realized the on-line data is out of date, and includes two South Portland
+    CSO locations that are no longer Active.  The Annual CSO reports from DEP
+    correctly states that South Portland now has only four CSOs.  That information 
+    simply is not represented in the on-line geospatial data.  We contacted South
+    Portland City staff, who confirmed that their CSO outfalls #4 and #19 are no
+    longer Active.  We removed them from the geospatial data by hand.
+
+For the "Portland_CSOs" shapefile, we took several additional steps:
 5.  We added a new (calculated) attribute with the form "CSO_###", which matches
     the nomenclature used in the Portland-specific CSO discharge data from 
     2015 through 2019.  
