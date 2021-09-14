@@ -2,23 +2,24 @@ Casco Bay CSO Revised Graphic for Final Graphic Design
 ================
 Curtis C. Bohlen, Casco Bay Estuary Partnership
 
-  - [Load DEP Data](#load-dep-data)
-      - [Establish Folder References](#establish-folder-references)
-  - [Load Weather Data](#load-weather-data)
-      - [Establish Folder Reference](#establish-folder-reference)
-      - [Access data](#access-data)
-  - [Identify Casco Bay CSO Communities by
+-   [Load DEP Data](#load-dep-data)
+    -   [Establish Folder References](#establish-folder-references)
+-   [Load Weather Data](#load-weather-data)
+    -   [Establish Folder Reference](#establish-folder-reference)
+    -   [Access data](#access-data)
+-   [Identify Casco Bay CSO Communities by
     Name](#identify-casco-bay-cso-communities-by-name)
-  - [Casco Bay Towns Data](#casco-bay-towns-data)
-  - [Merge Two Data Sets](#merge-two-data-sets)
-  - [Graphics](#graphics)
-      - [Regional CSO Volumes (by Town)](#regional-cso-volumes-by-town)
-          - [Linear Regression to Extract
+-   [Casco Bay Towns Data](#casco-bay-towns-data)
+-   [Merge Two Data Sets](#merge-two-data-sets)
+-   [Graphics](#graphics)
+    -   [Regional CSO Volumes (by Town)](#regional-cso-volumes-by-town)
+        -   [Linear Regression to Extract
             Slope](#linear-regression-to-extract-slope)
-          - [Graphic](#graphic)
-  - [Percent Reduction, Two Ways](#percent-reduction-two-ways)
-      - [Simple Year Over Year Change](#simple-year-over-year-change)
-      - [Linear Regression Predictions](#linear-regression-predictions)
+        -   [Graphic with Cape Elizabeth in
+            Red](#graphic-with-cape-elizabeth-in-red)
+-   [Percent Reduction, Two Ways](#percent-reduction-two-ways)
+    -   [Simple Year Over Year Change](#simple-year-over-year-change)
+    -   [Linear Regression Predictions](#linear-regression-predictions)
 
 <img
     src="https://www.cascobayestuary.org/wp-content/uploads/2014/04/logo_sm.jpg"
@@ -28,12 +29,16 @@ Curtis C. Bohlen, Casco Bay Estuary Partnership
 
 ``` r
 library(tidyverse)
-#> -- Attaching packages ----------------------------------------------------------------------------------- tidyverse 1.3.0 --
-#> v ggplot2 3.3.2     v purrr   0.3.4
-#> v tibble  3.0.3     v dplyr   1.0.2
-#> v tidyr   1.1.2     v stringr 1.4.0
-#> v readr   1.3.1     v forcats 0.5.0
-#> -- Conflicts -------------------------------------------------------------------------------------- tidyverse_conflicts() --
+#> Warning: package 'tidyverse' was built under R version 4.0.5
+#> -- Attaching packages --------------------------------------- tidyverse 1.3.1 --
+#> v ggplot2 3.3.3     v purrr   0.3.4
+#> v tibble  3.1.2     v dplyr   1.0.6
+#> v tidyr   1.1.3     v stringr 1.4.0
+#> v readr   1.4.0     v forcats 0.5.1
+#> Warning: package 'tidyr' was built under R version 4.0.5
+#> Warning: package 'dplyr' was built under R version 4.0.5
+#> Warning: package 'forcats' was built under R version 4.0.5
+#> -- Conflicts ------------------------------------------ tidyverse_conflicts() --
 #> x dplyr::filter() masks stats::filter()
 #> x dplyr::lag()    masks stats::lag()
 
@@ -42,7 +47,8 @@ load_cbep_fonts()
 theme_set(theme_cbep())
 
 library(corrplot)
-#> corrplot 0.84 loaded
+#> Warning: package 'corrplot' was built under R version 4.0.5
+#> corrplot 0.88 loaded
 ```
 
 # Load DEP Data
@@ -174,19 +180,19 @@ slope = round(coef(cb_towns_lm)[2],1)
 theannot <- paste( slope, 'MG per year')
 ```
 
-### Graphic
+### Graphic with Cape Elizabeth in Red
 
 ``` r
 plt <- cb_towns_data_long %>%
   ggplot(aes(x = Year, y = Volume)) + 
   geom_area(aes(fill = Community)) +
   ylab('CSO Volume\n(millions of gallons)') +
-  scale_fill_manual(values = cbep_colors()[c(3,5,4,1)], name = '') +
+  scale_fill_manual(values = c('red4', cbep_colors()[c(5,4,1)]), name = '') +
   theme(legend.position=c(.75,.75))
 plt
 ```
 
-![](DEP_CSO_Revised_Graphics_files/figure-gfm/town_graphics_1-1.png)<!-- -->
+![](DEP_CSO_Revised_Graphics_files/figure-gfm/town_graphics_2-1.png)<!-- -->
 
 ``` r
 plt +
@@ -210,17 +216,53 @@ plt +
             fontface = 'plain',
             size = 3,
             hjust = 0) +
-  scale_y_continuous(labels = scales::number,sec.axis = sec_axis(~ . / 25,
+  scale_y_continuous(sec.axis = sec_axis(~ . / 25,
+                                         name = "Annual Rainfall (in)")) +
+  theme(legend.text = element_text(size = 8))
+#> `geom_smooth()` using formula 'y ~ x'
+```
+
+![](DEP_CSO_Revised_Graphics_files/figure-gfm/Towns_add_annotations_1-1.png)<!-- -->
+
+``` r
+ggsave('figures/CSO_town_area_REVISED_red.pdf',
+       device = cairo_pdf, width = 7, height = 5)
+#> `geom_smooth()` using formula 'y ~ x'
+```
+
+``` r
+plt +
+  geom_line(mapping = aes(y = Precip_in * 25), 
+            data = data_combined,
+            color = cbep_colors()[3],
+            lwd = 0.5) +
+  geom_smooth(mapping = aes(y=Total),
+              data = data_combined,          
+              method = 'lm', se=FALSE,
+              color = cbep_colors()[3],
+              lwd = 0.5,
+              lty = 2) + 
+  geom_text(aes(x=2013, y=600, label = theannot),
+            family = 'Montserrat',
+            fontface = 'plain',
+            size = 4,
+            hjust = 0) +
+  geom_text(aes(x=2017, y=1400, label = 'Rainfall'),
+            family = 'Montserrat',
+            fontface = 'plain',
+            size = 3,
+            hjust = 0) +
+  scale_y_continuous(sec.axis = sec_axis(~ . / 25,
                                          name = "Annual Rainfall (in)")) +
   theme(legend.position = 'bottom',
         legend.text = element_text(size = 8))
 #> `geom_smooth()` using formula 'y ~ x'
 ```
 
-![](DEP_CSO_Revised_Graphics_files/figure-gfm/Towns_add_annotations-1.png)<!-- -->
+![](DEP_CSO_Revised_Graphics_files/figure-gfm/Towns_add_annotations_2-1.png)<!-- -->
 
 ``` r
-ggsave('figures/CSO_town_area_REVISED.pdf',
+ggsave('figures/CSO_town_area_REVISED_red_bottom.pdf',
        device = cairo_pdf, width = 7, height = 5)
 #> `geom_smooth()` using formula 'y ~ x'
 ```
