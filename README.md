@@ -18,7 +18,7 @@ review, critique, learn from, and build upon CBEP science.
 # Archive Structure
  CBEP 2020 State of the Bay data analysis repositories are divided into from two
  to four sub-folders.  All archives contain at least an "Original_Data" and a
- "Graphics" folder.  The other two foldersare only included if strictly
+ "Graphics" folder.  The other two folders are only included if strictly
  necessary.
 
 - Original Data.  Original data, with one or more "DATA_SOURCES.md" files
@@ -95,5 +95,5 @@ be listed as "active".
 
 Discharges from sites in other CSO communities (South Portland and Westbrook)
 have also been sharply reduced, to the point that these CSOs have probably been
-effectively retired, but we avoid trying to make making that determination
+effectively retired, but we avoid trying to make that determination
 without an official source.
